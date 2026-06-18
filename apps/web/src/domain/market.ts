@@ -10,6 +10,11 @@ export type InstrumentParts = {
   symbol: string;
 };
 
+const exchangesByMarket: Record<Market, readonly Exchange[]> = {
+  KR: ["XKRX", "XKOSDAQ"],
+  US: ["XNYS", "XNAS"],
+};
+
 export function toInstrumentId(parts: InstrumentParts): InstrumentId {
   if (parts.symbol.trim().length === 0) {
     throw new Error("InstrumentId symbol must not be empty");
@@ -28,12 +33,17 @@ export function parseInstrumentId(instrumentId: InstrumentId): InstrumentParts {
   const [market, exchange, symbol] = parts;
   if (
     (market !== "KR" && market !== "US") ||
-    !["XKRX", "XKOSDAQ", "XNYS", "XNAS"].includes(exchange) ||
-    symbol.trim().length === 0
+    !isExchangeForMarket(market, exchange) ||
+    symbol.trim().length === 0 ||
+    symbol !== symbol.trim()
   ) {
     throw new Error(`Invalid InstrumentId: ${instrumentId}`);
   }
   return { market, exchange: exchange as Exchange, symbol };
+}
+
+function isExchangeForMarket(market: Market, exchange: string): exchange is Exchange {
+  return exchangesByMarket[market].includes(exchange as Exchange);
 }
 
 export type DataFinality = "provisional" | "confirmed";

@@ -42,6 +42,46 @@ describe("Broker import route", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects holdings with trailing InstrumentId symbol whitespace", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/broker/import", {
+        method: "POST",
+        body: JSON.stringify({
+          holdings: [
+            {
+              instrumentId: "US:XNAS:AAPL ",
+              quantity: 10,
+              averageEntryPrice: 100,
+              marketValue: 1_000,
+            },
+          ],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects holdings with mismatched InstrumentId market and exchange", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/broker/import", {
+        method: "POST",
+        body: JSON.stringify({
+          holdings: [
+            {
+              instrumentId: "KR:XNAS:AAPL",
+              quantity: 10,
+              averageEntryPrice: 100,
+              marketValue: 1_000,
+            },
+          ],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+  });
+
   it("accepts valid holdings", async () => {
     const response = await POST(
       new Request("http://localhost/api/broker/import", {
