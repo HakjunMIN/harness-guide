@@ -40,7 +40,7 @@ class AnalysisRunRequest(BaseModel):
         validation_alias=AliasChoices("ai_context", "aiContext")
     )
     source_evidence: list[EvidenceSourceRequest] = Field(
-        default_factory=list,
+        min_length=1,
         validation_alias=AliasChoices("source_evidence", "sourceEvidence"),
     )
 

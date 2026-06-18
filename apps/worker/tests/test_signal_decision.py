@@ -1,3 +1,6 @@
+import asyncio
+import json
+
 import pytest
 from worker.ai_context import apply_ai_weight_haircut
 from worker.app import AnalysisRunRequest, app, run_analysis
@@ -12,6 +15,59 @@ from worker.signal_decision import create_signal_decision
 from pydantic import ValidationError
 
 
+def post_json(path: str, payload: dict[str, object]) -> tuple[int, dict[str, object]]:
+    async def call_app() -> tuple[int, dict[str, object]]:
+        request_body = json.dumps(payload).encode()
+        messages: list[dict[str, object]] = []
+        request_sent = False
+
+        async def receive() -> dict[str, object]:
+            nonlocal request_sent
+            if request_sent:
+                return {"type": "http.disconnect"}
+            request_sent = True
+            return {
+                "type": "http.request",
+                "body": request_body,
+                "more_body": False,
+            }
+
+        async def send(message: dict[str, object]) -> None:
+            messages.append(message)
+
+        await app(
+            {
+                "type": "http",
+                "asgi": {"version": "3.0", "spec_version": "2.3"},
+                "http_version": "1.1",
+                "method": "POST",
+                "scheme": "http",
+                "path": path,
+                "raw_path": path.encode(),
+                "query_string": b"",
+                "headers": [(b"content-type", b"application/json")],
+                "client": ("testclient", 50000),
+                "server": ("testserver", 80),
+            },
+            receive,
+            send,
+        )
+
+        status = next(
+            message["status"]
+            for message in messages
+            if message["type"] == "http.response.start"
+        )
+        body = b"".join(
+            message.get("body", b"")
+            for message in messages
+            if message["type"] == "http.response.body"
+        )
+        return int(status), json.loads(body or b"{}")
+
+    return asyncio.run(call_app())
+
+
 def source_evidence_payload(source_id: str = "news-1") -> dict[str, str]:
     return {
         "source_id": source_id,
@@ -20,6 +76,49 @@ def source_evidence_payload(source_id: str = "news-1") -> dict[str, str]:
         "url": "https://example.com/aapl-news",
         "observed_at": "2026-06-18T00:00:00.000Z",
         "finality": "confirmed",
+    }
+
+
+def source_evidence_camel_payload(source_id: str = "news-1") -> dict[str, str]:
+    return {
+        "sourceId": source_id,
+        "sourceType": "news",
+        "title": "AAPL catalyst coverage",
+        "url": "https://example.com/aapl-news",
+        "observedAt": "2026-06-18T00:00:00.000Z",
+        "finality": "confirmed",
+    }
+
+
+def analysis_run_camel_payload(
+    source_evidence: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
+    instrument_id = "US:XNAS:AAPL"
+    return {
+        "instrumentId": instrument_id,
+        "finality": "confirmed",
+        "bars": [
+            {
+                "instrument_id": instrument_id,
+                "close": 100 + index,
+                "volume": 1_000_000 + (index * 10_000),
+            }
+            for index in range(60)
+        ],
+        "aiContext": {
+            "catalyst_score": 0.7,
+            "uncertainty_score": 0.2,
+            "evidence_quality_score": 0.9,
+            "freshness_score": 0.9,
+            "contradiction_count": 0,
+            "source_count": 3,
+        },
+        "sourceEvidence": source_evidence
+        if source_evidence is not None
+        else [
+            source_evidence_camel_payload("news-1"),
+            source_evidence_camel_payload("news-2"),
+        ],
     }
 
 
@@ -234,7 +333,7 @@ def test_analysis_run_route_returns_signal_decision_payload() -> None:
 
 
 def test_analysis_run_request_rejects_invalid_finality() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as error:
         AnalysisRunRequest(
             instrument_id="US:XNAS:AAPL",
             finality="bogus",
@@ -247,11 +346,15 @@ def test_analysis_run_request_rejects_invalid_finality() -> None:
                 "contradiction_count": 0,
                 "source_count": 3,
             },
-            source_evidence=[],
+            source_evidence=[
+                source_evidence_payload("news-1"),
+                source_evidence_payload("news-2"),
+            ],
         )
+    assert error.value.errors()[0]["loc"] == ("finality",)
 
 
-def test_analysis_run_request_accepts_camel_case_instrument_id_and_ai_context() -> None:
+def test_analysis_run_request_accepts_task_4_camel_case_payload_with_source_evidence() -> None:
     request = AnalysisRunRequest(
         instrumentId="US:XNAS:AAPL",
         finality="confirmed",
@@ -264,8 +367,44 @@ def test_analysis_run_request_accepts_camel_case_instrument_id_and_ai_context() 
             "contradiction_count": 0,
             "source_count": 3,
         },
-        source_evidence=[],
+        sourceEvidence=[
+            source_evidence_camel_payload("news-1"),
+            source_evidence_camel_payload("news-2"),
+        ],
     )
 
     assert request.instrument_id == "US:XNAS:AAPL"
     assert request.ai_context["source_count"] == 3
+    assert [evidence.source_id for evidence in request.source_evidence] == [
+        "news-1",
+        "news-2",
+    ]
+
+
+def test_analysis_run_route_accepts_task_4_camel_case_payload_with_source_evidence() -> None:
+    status_code, body = post_json("/analysis/run", analysis_run_camel_payload())
+
+    assert status_code == 200
+    assert body["instrumentId"] == "US:XNAS:AAPL"
+    assert [source["sourceId"] for source in body["sourceEvidence"]] == [
+        "news-1",
+        "news-2",
+    ]
+
+
+def test_analysis_run_route_rejects_missing_source_evidence_as_client_error() -> None:
+    payload = analysis_run_camel_payload()
+    payload.pop("sourceEvidence")
+
+    status_code, _body = post_json("/analysis/run", payload)
+
+    assert status_code in {400, 422}
+
+
+def test_analysis_run_route_rejects_empty_source_evidence_as_client_error() -> None:
+    status_code, _body = post_json(
+        "/analysis/run",
+        analysis_run_camel_payload(source_evidence=[]),
+    )
+
+    assert status_code in {400, 422}
