@@ -33,6 +33,27 @@ describe("domain language", () => {
     ).toThrow("Invalid InstrumentId");
   });
 
+  it("rejects InstrumentId values with whitespace-only symbols", () => {
+    expect(() => parseInstrumentId("US:XNAS:   " as InstrumentId)).toThrow(
+      "Invalid InstrumentId",
+    );
+  });
+
+  it("rejects InstrumentId values with trailing symbol whitespace", () => {
+    expect(() => parseInstrumentId("US:XNAS:AAPL " as InstrumentId)).toThrow(
+      "Invalid InstrumentId",
+    );
+  });
+
+  it("rejects InstrumentId values with mismatched market and exchange", () => {
+    expect(() => parseInstrumentId("KR:XNAS:AAPL" as InstrumentId)).toThrow(
+      "Invalid InstrumentId",
+    );
+    expect(() => parseInstrumentId("US:XKRX:005930" as InstrumentId)).toThrow(
+      "Invalid InstrumentId",
+    );
+  });
+
   it("rejects InstrumentId symbols containing colons", () => {
     expect(() =>
       toInstrumentId({
