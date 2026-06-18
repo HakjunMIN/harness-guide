@@ -52,13 +52,14 @@ type InstrumentCatalogEntry = {
   themes: string[];
   sectors: string[];
   defaultQualityFlags: QualityFlag[];
+  actionLabel: "BUY" | "HOLD" | "SELL" | "REVIEW_REQUIRED";
 };
 
 const catalog: InstrumentCatalogEntry[] = [
-  entry("KR:XKRX:005930", "Samsung Electronics", "KR", "005930", ["samsung electronics", "samsung", "삼성전자", "삼성"], ["ai_infrastructure", "memory_semiconductor", "korea_large_cap"], ["semiconductors", "hardware"], ["confirmed_end_of_day_data"]),
-  entry("KR:XKRX:000830", "Samsung C&T", "KR", "000830", ["samsung c&t", "samsung", "삼성물산", "삼성"], ["korea_large_cap", "dividend_stability"], ["industrials"], ["confirmed_end_of_day_data"]),
-  entry("US:XNAS:AAPL", "Apple", "US", "AAPL", ["apple", "aapl", "애플"], ["quality_growth", "consumer_ai"], ["hardware", "consumer_technology"], ["confirmed_end_of_day_data"]),
-  entry("US:XNAS:NVDA", "NVIDIA", "US", "NVDA", ["nvidia", "nvda", "엔비디아"], ["ai_infrastructure", "semiconductors"], ["semiconductors"], ["high_volatility"]),
+  entry("KR:XKRX:005930", "Samsung Electronics", "KR", "005930", ["samsung electronics", "samsung", "삼성전자", "삼성"], ["ai_infrastructure", "memory_semiconductor", "korea_large_cap"], ["semiconductors", "hardware"], ["confirmed_end_of_day_data"], "HOLD"),
+  entry("KR:XKRX:000830", "Samsung C&T", "KR", "000830", ["samsung c&t", "samsung", "삼성물산", "삼성"], ["korea_large_cap", "dividend_stability"], ["industrials"], ["confirmed_end_of_day_data"], "HOLD"),
+  entry("US:XNAS:AAPL", "Apple", "US", "AAPL", ["apple", "aapl", "애플"], ["quality_growth", "consumer_ai"], ["hardware", "consumer_technology"], ["confirmed_end_of_day_data"], "BUY"),
+  entry("US:XNAS:NVDA", "NVIDIA", "US", "NVDA", ["nvidia", "nvda", "엔비디아"], ["ai_infrastructure", "semiconductors"], ["semiconductors"], ["high_volatility"], "BUY"),
 ];
 
 export function searchInstruments(
@@ -122,6 +123,9 @@ function collectCandidates(
       if (intent.market && item.market !== intent.market) {
         return false;
       }
+      if (mode === "investment_idea_screen" && intent.actionLabels.length > 0 && !intent.actionLabels.includes(item.actionLabel)) {
+        return false;
+      }
       return matchReasons.length > 0;
     })
     .map(({ item, matchReasons }) => ({
@@ -169,7 +173,7 @@ function collectMatchReasons(
     if (intent.sectors.some((sector) => item.sectors.includes(sector))) {
       reasons.add("theme_match");
     }
-    if (intent.actionLabels.includes("BUY") && item.themes.includes("ai_infrastructure")) {
+    if (intent.actionLabels.includes(item.actionLabel) && reasons.size > 0) {
       reasons.add("signal_filter_match");
     }
     if (intent.portfolioScope && portfolioAvailable && item.instrumentId === "KR:XKRX:005930") {
@@ -237,6 +241,7 @@ function entry(
   themes: string[],
   sectors: string[],
   defaultQualityFlags: QualityFlag[],
+  actionLabel: "BUY" | "HOLD" | "SELL" | "REVIEW_REQUIRED",
 ): InstrumentCatalogEntry {
-  return { instrumentId, displayName, market, ticker, aliases, themes, sectors, defaultQualityFlags };
+  return { instrumentId, displayName, market, ticker, aliases, themes, sectors, defaultQualityFlags, actionLabel };
 }

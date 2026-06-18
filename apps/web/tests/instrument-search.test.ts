@@ -115,12 +115,10 @@ describe("Instrument search", () => {
     expect(result.relatedScreenCandidates).toEqual([]);
   });
 
-  it("does not mark non-BUY signal screens as strong AI infrastructure evidence", () => {
+  it("does not return BUY fixtures as weak matches for SELL signal screens", () => {
     const result = searchInstruments("US AI infrastructure SELL candidates");
 
-    expect(result.primaryCandidates[0].screeningEvidence).toMatchObject({
-      quality: "weak",
-      weaknessReason: "Matched by structured criteria without enough cited source material.",
-    });
+    expect(result.primaryCandidates).toEqual([]);
+    expect(result.noMatch?.understoodTerms).toEqual(["us", "ai", "infrastructure", "sell", "candidates"]);
   });
 });

@@ -23,15 +23,30 @@ export type ResearchDetailViewModel = {
   charts: ResearchChartSuite;
 };
 
+type ResearchFixture = {
+  displayName: string;
+  actionLabel: ActionLabel;
+  confidence: number;
+  tradeTimingPlan: TradeTimingPlan;
+  aiContribution: number;
+  aiWeightHaircut: number;
+  rationale: string[];
+  conflictingEvidence: string[];
+  qualityFlags: QualityFlag[];
+  portfolioImpact: string;
+  backtestLimitation?: string;
+};
+
+type ReportPanelId = "evidence" | "technical" | "ai-context" | "portfolio" | "backtest" | "risk" | "audit" | "actions";
+
 export function buildResearchDetail(
   instrumentId: InstrumentId,
   options: { portfolioAvailable?: boolean } = {},
 ): ResearchDetailViewModel {
   const portfolioAvailable = options.portfolioAvailable !== false;
-  const isLimitedBacktest = instrumentId === "KR:XKRX:000830";
-  const isSupported = instrumentId === "US:XNAS:NVDA" || instrumentId === "US:XNAS:AAPL" || isLimitedBacktest;
+  const fixture = researchFixtures[instrumentId];
 
-  if (!isSupported) {
+  if (!fixture) {
     return {
       instrumentId,
       displayName: "Unsupported instrument",
@@ -57,21 +72,15 @@ export function buildResearchDetail(
 
   return {
     instrumentId,
-    displayName: instrumentId === "KR:XKRX:000830" ? "Samsung C&T" : instrumentId === "US:XNAS:AAPL" ? "Apple" : "NVIDIA",
-    actionLabel: isLimitedBacktest ? "REVIEW_REQUIRED" : "BUY",
-    confidence: isLimitedBacktest ? 0.57 : 0.88,
+    displayName: fixture.displayName,
+    actionLabel: fixture.actionLabel,
+    confidence: fixture.confidence,
     finality: "confirmed",
-    tradeTimingPlan: isLimitedBacktest
-      ? timing("REVIEW_REQUIRED", 154000, 159000, 148000, 171000, 178000)
-      : timing("BUY", 118, 124, 109, 138, 146),
-    aiContribution: isLimitedBacktest ? 0.18 : 0.42,
-    aiWeightHaircut: isLimitedBacktest ? 0 : 0.06,
-    rationale: isLimitedBacktest
-      ? ["Dividend stability supports monitoring, but backtest evidence is limited."]
-      : ["Trend, volume confirmation, and AI infrastructure catalyst evidence align with the Strategy Profile."],
-    conflictingEvidence: isLimitedBacktest
-      ? ["Insufficient backtest sample for this instrument."]
-      : ["High volatility requires disciplined entry and stop monitoring."],
+    tradeTimingPlan: fixture.tradeTimingPlan,
+    aiContribution: fixture.aiContribution,
+    aiWeightHaircut: fixture.aiWeightHaircut,
+    rationale: fixture.rationale,
+    conflictingEvidence: fixture.conflictingEvidence,
     evidence: [
       {
         sourceType: "news",
@@ -81,12 +90,12 @@ export function buildResearchDetail(
         finality: "confirmed",
       },
     ],
-    qualityFlags: isLimitedBacktest ? ["insufficient_backtest_sample"] : ["high_volatility"],
+    qualityFlags: fixture.qualityFlags,
     portfolioAvailable,
     portfolioImpact: portfolioAvailable
-      ? "Add-on candidate, but position size should respect semiconductor concentration."
+      ? fixture.portfolioImpact
       : "Portfolio unavailable; portfolio-specific claims are not shown.",
-    ...(isLimitedBacktest ? { backtestLimitation: "Insufficient backtest sample for this instrument." } : {}),
+    ...(fixture.backtestLimitation ? { backtestLimitation: fixture.backtestLimitation } : {}),
     auditEvents: [
       "Confirmed Signal recalculated from end-of-day data.",
       "Strategy Profile version swing-momentum-v1 applied.",
@@ -95,6 +104,58 @@ export function buildResearchDetail(
     charts: chartsFor(instrumentId, portfolioAvailable),
   };
 }
+
+const researchFixtures: Partial<Record<InstrumentId, ResearchFixture>> = {
+  "KR:XKRX:005930": {
+    displayName: "Samsung Electronics",
+    actionLabel: "HOLD",
+    confidence: 0.64,
+    tradeTimingPlan: timing("HOLD", 71000, 73500, 67500, 79000, 82500),
+    aiContribution: 0.21,
+    aiWeightHaircut: 0.08,
+    rationale: ["Memory semiconductor recovery and AI infrastructure exposure support a monitored HOLD setup."],
+    conflictingEvidence: ["Cycle sensitivity and export demand uncertainty require professional review."],
+    qualityFlags: ["confirmed_end_of_day_data"],
+    portfolioImpact: "Core Korean semiconductor exposure; monitor concentration before adding risk.",
+  },
+  "KR:XKRX:000830": {
+    displayName: "Samsung C&T",
+    actionLabel: "REVIEW_REQUIRED",
+    confidence: 0.57,
+    tradeTimingPlan: timing("REVIEW_REQUIRED", 154000, 159000, 148000, 171000, 178000),
+    aiContribution: 0.18,
+    aiWeightHaircut: 0,
+    rationale: ["Dividend stability supports monitoring, but backtest evidence is limited."],
+    conflictingEvidence: ["Insufficient backtest sample for this instrument."],
+    qualityFlags: ["insufficient_backtest_sample"],
+    portfolioImpact: "Dividend stability candidate; monitor industrials exposure.",
+    backtestLimitation: "Insufficient backtest sample for this instrument.",
+  },
+  "US:XNAS:AAPL": {
+    displayName: "Apple",
+    actionLabel: "BUY",
+    confidence: 0.82,
+    tradeTimingPlan: timing("BUY", 198, 204, 188, 224, 232),
+    aiContribution: 0.4,
+    aiWeightHaircut: 0,
+    rationale: ["Quality growth and consumer AI evidence align with the Strategy Profile."],
+    conflictingEvidence: ["Product-cycle uncertainty requires disciplined entry monitoring."],
+    qualityFlags: ["confirmed_end_of_day_data"],
+    portfolioImpact: "Quality growth candidate; review mega-cap technology concentration.",
+  },
+  "US:XNAS:NVDA": {
+    displayName: "NVIDIA",
+    actionLabel: "BUY",
+    confidence: 0.88,
+    tradeTimingPlan: timing("BUY", 118, 124, 109, 138, 146),
+    aiContribution: 0.42,
+    aiWeightHaircut: 0.06,
+    rationale: ["Trend, volume confirmation, and AI infrastructure catalyst evidence align with the Strategy Profile."],
+    conflictingEvidence: ["High volatility requires disciplined entry and stop monitoring."],
+    qualityFlags: ["high_volatility"],
+    portfolioImpact: "Add-on candidate, but position size should respect semiconductor concentration.",
+  },
+};
 
 function chartsFor(instrumentId: InstrumentId, portfolioAvailable: boolean): ResearchChartSuite {
   const charts = buildResearchChartSuite(instrumentId);
@@ -122,38 +183,86 @@ function unavailableChartSuite(reason: string): ResearchChartSuite {
   };
 }
 
-export function renderResearchDetailPage(detail: ResearchDetailViewModel): string {
+export function renderResearchDetailPage(
+  detail: ResearchDetailViewModel,
+  options: { selectedPanel?: ReportPanelId } = {},
+): string {
+  const selectedPanel = options.selectedPanel ?? "evidence";
+  const panelRows = reportPanelRows(detail);
   return [
     '<article class="research-detail">',
     `<header class="terminal-header"><p>${escapeHtml(detail.instrumentId)}</p><h1>${escapeHtml(detail.displayName)} Research Detail</h1></header>`,
     fixedSummary(detail),
     primaryChartPanel(detail.charts.priceVolume),
-    '<section class="report-tabs" aria-label="Report tabs"><h2>Report tabs</h2><nav class="segmented-tabs" aria-label="Research Report Panels"><span class="tab-chip">Evidence</span><span class="tab-chip">Technical</span><span class="tab-chip">AI Context</span><span class="tab-chip">Portfolio</span><span class="tab-chip">Backtest</span><span class="tab-chip">Risk</span><span class="tab-chip">Audit</span></nav>',
-    panel("Evidence Panel", [
-      ...detail.evidence.map((source) => `${source.sourceType}: ${source.title}`),
-      ...detail.conflictingEvidence,
-    ]),
-    panel("Technical Report Panel", ["Recharts technical indicators are rendered from chart-ready models."]),
-    panel("AI Context Report Panel", [
-      `AI contribution: ${formatPercent(detail.aiContribution)}`,
-      `AI Weight Haircut: ${formatPercent(detail.aiWeightHaircut)}`,
-    ]),
-    panel("Portfolio Impact Report Panel", [detail.portfolioImpact]),
-    panel(
-      "Backtest Report Panel",
-      detail.backtestLimitation
-        ? [detail.backtestLimitation, "Review required before interpreting performance support."]
-        : ["Win rate, expected value, maximum drawdown, and equity curve available."],
-    ),
-    panel("Risk Report Panel", [`Quality flags: ${detail.qualityFlags.join(", ")}`, ...detail.conflictingEvidence]),
-    panel("Audit Panel", detail.auditEvents),
-    panel("Research and Report Actions Panel", [
-      "Generate or update an editable Research Note from this evidence.",
-      "Draft a Client Report only after Research Note approval and Portfolio context review.",
-    ]),
+    '<section class="report-tabs" aria-label="Report tabs"><h2>Report tabs</h2>',
+    tabNav(selectedPanel),
+    panel(panelRows[selectedPanel], true),
     "</section>",
     "</article>",
   ].join("");
+}
+
+function tabNav(selectedPanel: ReportPanelId): string {
+  const tabs: Array<{ id: ReportPanelId; label: string }> = [
+    { id: "evidence", label: "Evidence" },
+    { id: "technical", label: "Technical" },
+    { id: "ai-context", label: "AI Context" },
+    { id: "portfolio", label: "Portfolio" },
+    { id: "backtest", label: "Backtest" },
+    { id: "risk", label: "Risk" },
+    { id: "audit", label: "Audit" },
+    { id: "actions", label: "Research Actions" },
+  ];
+  return [
+    '<nav class="segmented-tabs" aria-label="Research Report Panels">',
+    ...tabs.map(({ id, label }) => {
+      const active = id === selectedPanel;
+      return `<a class="tab-chip${active ? " active" : ""}" href="#panel-${id}"${active ? ' aria-current="page"' : ""}>${escapeHtml(label)}</a>`;
+    }),
+    "</nav>",
+  ].join("");
+}
+
+function reportPanelRows(detail: ResearchDetailViewModel): Record<ReportPanelId, { id: ReportPanelId; title: string; rows: string[] }> {
+  return {
+    evidence: {
+      id: "evidence",
+      title: "Evidence Panel",
+      rows: [...detail.evidence.map((source) => `${source.sourceType}: ${source.title}`), ...detail.conflictingEvidence],
+    },
+    technical: {
+      id: "technical",
+      title: "Technical Report Panel",
+      rows: ["Recharts technical indicators are rendered from chart-ready models."],
+    },
+    "ai-context": {
+      id: "ai-context",
+      title: "AI Context Report Panel",
+      rows: [`AI contribution: ${formatPercent(detail.aiContribution)}`, `AI Weight Haircut: ${formatPercent(detail.aiWeightHaircut)}`],
+    },
+    portfolio: { id: "portfolio", title: "Portfolio Impact Report Panel", rows: [detail.portfolioImpact] },
+    backtest: {
+      id: "backtest",
+      title: "Backtest Report Panel",
+      rows: detail.backtestLimitation
+        ? [detail.backtestLimitation, "Review required before interpreting performance support."]
+        : ["Win rate, expected value, maximum drawdown, and equity curve available."],
+    },
+    risk: {
+      id: "risk",
+      title: "Risk Report Panel",
+      rows: [`Quality flags: ${detail.qualityFlags.join(", ")}`, ...detail.conflictingEvidence],
+    },
+    audit: { id: "audit", title: "Audit Panel", rows: detail.auditEvents },
+    actions: {
+      id: "actions",
+      title: "Research and Report Actions Panel",
+      rows: [
+        "Generate or update an editable Research Note from this evidence.",
+        "Draft a Client Report only after Research Note approval and Portfolio context review.",
+      ],
+    },
+  };
 }
 
 function fixedSummary(detail: ResearchDetailViewModel): string {
@@ -194,6 +303,7 @@ function primaryChartPanel(
     entryZone: { low: number; high: number };
     stopLevel: number;
     targetZone: { low: number; high: number };
+    signalMarkers: Array<{ date: string; label: string; price: number }>;
   }>,
 ): string {
   if (panel.state === "unavailable") {
@@ -221,8 +331,12 @@ function primaryChartPanel(
   ].join("");
 }
 
-function panel(title: string, rows: string[]): string {
-  return [`<section class="report-panel"><h3>${escapeHtml(title)}</h3>`, ...rows.map((row) => `<p>${escapeHtml(row)}</p>`), "</section>"].join("");
+function panel(panelData: { id: ReportPanelId; title: string; rows: string[] }, active = false): string {
+  return [
+    `<section id="panel-${panelData.id}" class="report-panel${active ? " active" : ""}"><h3>${escapeHtml(panelData.title)}</h3>`,
+    ...panelData.rows.map((row) => `<p>${escapeHtml(row)}</p>`),
+    "</section>",
+  ].join("");
 }
 
 function timing(

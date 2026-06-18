@@ -120,4 +120,10 @@ describe("Search Result Assembler", () => {
 
     expect(assembleSearchResultCards(result)).toEqual([]);
   });
+
+  it("does not return BUY action cards for SELL signal screens", () => {
+    const cards = assembleSearchResultCards(searchInstruments("US AI infrastructure SELL candidates"));
+
+    expect(cards.every((card) => card.actionLabel === "SELL")).toBe(true);
+  });
 });

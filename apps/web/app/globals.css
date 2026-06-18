@@ -133,6 +133,13 @@ a {
   border-radius: 999px;
   color: var(--text-1);
   padding: 7px 11px;
+  text-decoration: none;
+}
+
+.tab-chip.active {
+  border-color: var(--accent);
+  color: var(--text-0);
+  background: rgba(125, 211, 252, 0.12);
 }
 
 .chart-scroll {

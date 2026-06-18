@@ -10,6 +10,7 @@ export type ResearchChartSuite = {
     entryZone: { low: number; high: number };
     stopLevel: number;
     targetZone: { low: number; high: number };
+    signalMarkers: Array<{ date: string; label: string; price: number }>;
   }>;
   indicators: ChartPanel<{
     rsi: number;
@@ -39,20 +40,49 @@ export type ResearchChartSuite = {
 
 export function buildResearchChartSuite(instrumentId: InstrumentId): ResearchChartSuite {
   const isIncomplete = instrumentId === "KR:XKRX:000830";
+  const isSamsungElectronics = instrumentId === "KR:XKRX:005930";
+  const priceLevels = isSamsungElectronics
+    ? {
+        points: [
+          { date: "2026-06-14", close: 70400, volume: 12800000 },
+          { date: "2026-06-15", close: 71600, volume: 14300000 },
+          { date: "2026-06-16", close: 72800, volume: 16700000 },
+          { date: "2026-06-17", close: 72100, volume: 15100000 },
+        ],
+        entryZone: { low: 71000, high: 73500 },
+        stopLevel: 67500,
+        targetZone: { low: 79000, high: 82500 },
+        signalMarkers: [{ date: "2026-06-16", label: "HOLD confirmed", price: 72800 }],
+      }
+    : isIncomplete
+      ? {
+          points: [
+            { date: "2026-06-14", close: 151000, volume: 920000 },
+            { date: "2026-06-15", close: 154500, volume: 1010000 },
+            { date: "2026-06-16", close: 157000, volume: 1130000 },
+            { date: "2026-06-17", close: 156500, volume: 1080000 },
+          ],
+          entryZone: { low: 154000, high: 159000 },
+          stopLevel: 148000,
+          targetZone: { low: 171000, high: 178000 },
+          signalMarkers: [{ date: "2026-06-16", label: "REVIEW_REQUIRED confirmed", price: 157000 }],
+        }
+      : {
+          points: [
+            { date: "2026-06-14", close: 116, volume: 1200000 },
+            { date: "2026-06-15", close: 119, volume: 1420000 },
+            { date: "2026-06-16", close: 123, volume: 1810000 },
+            { date: "2026-06-17", close: 126, volume: 1740000 },
+          ],
+          entryZone: { low: 118, high: 124 },
+          stopLevel: 109,
+          targetZone: { low: 138, high: 146 },
+          signalMarkers: [{ date: "2026-06-16", label: "BUY confirmed", price: 123 }],
+        };
   return {
     priceVolume: {
       state: "available",
-      data: {
-        points: [
-          { date: "2026-06-14", close: 116, volume: 1200000 },
-          { date: "2026-06-15", close: 119, volume: 1420000 },
-          { date: "2026-06-16", close: 123, volume: 1810000 },
-          { date: "2026-06-17", close: 126, volume: 1740000 },
-        ],
-        entryZone: isIncomplete ? { low: 154000, high: 159000 } : { low: 118, high: 124 },
-        stopLevel: isIncomplete ? 148000 : 109,
-        targetZone: isIncomplete ? { low: 171000, high: 178000 } : { low: 138, high: 146 },
-      },
+      data: priceLevels,
     },
     indicators: {
       state: "available",

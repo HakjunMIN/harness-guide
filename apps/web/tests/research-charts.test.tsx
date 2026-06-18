@@ -26,4 +26,15 @@ describe("research Recharts components", () => {
 
     expect(html.match(/class="chart-scroll"/g) ?? []).toHaveLength(6);
   });
+
+  it("renders price chart volume, timing overlays, and signal markers", () => {
+    const html = renderToStaticMarkup(renderResearchCharts(buildResearchChartSuite("US:XNAS:NVDA")));
+
+    expect(html).toContain("Volume");
+    expect(html).toContain("Entry Zone");
+    expect(html).toContain("Stop Level");
+    expect(html).toContain("Target Zone");
+    expect(html).toContain("Signal marker");
+    expect(html).toContain("BUY confirmed");
+  });
 });
