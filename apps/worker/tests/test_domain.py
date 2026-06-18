@@ -26,6 +26,26 @@ def test_instrument_id_rejects_symbol_containing_colon() -> None:
         InstrumentId(market="KR", exchange="XKRX", symbol="005930:EXTRA")
 
 
+def test_instrument_id_direct_construction_rejects_invalid_market() -> None:
+    with pytest.raises(ValueError, match="Invalid InstrumentId market: JP"):
+        InstrumentId(market="JP", exchange="XKRX", symbol="005930")
+
+
+def test_instrument_id_direct_construction_rejects_invalid_exchange() -> None:
+    with pytest.raises(ValueError, match="Invalid InstrumentId exchange: XTKS"):
+        InstrumentId(market="KR", exchange="XTKS", symbol="005930")
+
+
+def test_instrument_id_direct_construction_rejects_empty_symbol() -> None:
+    with pytest.raises(ValueError, match="InstrumentId symbol must not be empty"):
+        InstrumentId(market="KR", exchange="XKRX", symbol="")
+
+
+def test_instrument_id_direct_construction_rejects_colon_symbol() -> None:
+    with pytest.raises(ValueError, match="InstrumentId symbol must not contain ':'"):
+        InstrumentId(market="US", exchange="XNAS", symbol="AAPL:EXTRA")
+
+
 def test_default_strategy_profile_weights() -> None:
     profile = StrategyProfile.default_swing_momentum()
 

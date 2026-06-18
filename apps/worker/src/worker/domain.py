@@ -22,6 +22,12 @@ class InstrumentId:
     symbol: str
 
     def __post_init__(self) -> None:
+        if self.market not in ("KR", "US"):
+            raise ValueError(f"Invalid InstrumentId market: {self.market}")
+        if self.exchange not in ("XKRX", "XKOSDAQ", "XNYS", "XNAS"):
+            raise ValueError(f"Invalid InstrumentId exchange: {self.exchange}")
+        if not self.symbol:
+            raise ValueError("InstrumentId symbol must not be empty")
         if ":" in self.symbol:
             raise ValueError("InstrumentId symbol must not contain ':'")
 
