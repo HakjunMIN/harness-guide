@@ -12,6 +12,7 @@ Market = Literal["KR", "US"]
 Exchange = Literal["XKRX", "XKOSDAQ", "XNYS", "XNAS"]
 Finality = Literal["provisional", "confirmed"]
 ActionLabel = Literal["BUY", "HOLD", "SELL", "REVIEW_REQUIRED"]
+EvidenceSourceType = Literal["price", "disclosure", "news", "filing", "research"]
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,16 @@ class TradeTimingPlan:
 
 
 @dataclass(frozen=True)
+class EvidenceSource:
+    source_id: str
+    source_type: EvidenceSourceType
+    title: str
+    url: str
+    observed_at: str
+    finality: Finality
+
+
+@dataclass(frozen=True)
 class SignalDecision:
     instrument_id: InstrumentId
     finality: Finality
@@ -105,5 +116,6 @@ class SignalDecision:
     ai_contribution: float
     ai_weight_haircut: float
     quality_flags: tuple[str, ...]
+    source_evidence: tuple[EvidenceSource, ...]
     trade_timing_plan: TradeTimingPlan
     rationale: tuple[str, ...]

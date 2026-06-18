@@ -18,7 +18,11 @@ export function toInstrumentId(parts: InstrumentParts): InstrumentId {
 }
 
 export function parseInstrumentId(instrumentId: InstrumentId): InstrumentParts {
-  const [market, exchange, symbol] = instrumentId.split(":");
+  const parts = instrumentId.split(":");
+  if (parts.length !== 3) {
+    throw new Error(`Invalid InstrumentId: ${instrumentId}`);
+  }
+  const [market, exchange, symbol] = parts;
   if (
     (market !== "KR" && market !== "US") ||
     !["XKRX", "XKOSDAQ", "XNYS", "XNAS"].includes(exchange) ||

@@ -16,6 +16,15 @@ export type TradeTimingPlan = {
   timeHorizon: "days_to_weeks";
 };
 
+export type EvidenceSource = {
+  sourceId: string;
+  sourceType: "price" | "disclosure" | "news" | "filing" | "research";
+  title: string;
+  url: string;
+  observedAt: string;
+  finality: DataFinality;
+};
+
 export type SignalDecision = {
   instrumentId: InstrumentId;
   finality: DataFinality;
@@ -24,6 +33,7 @@ export type SignalDecision = {
   aiContribution: number;
   aiWeightHaircut: number;
   qualityFlags: QualityFlag[];
+  sourceEvidence: EvidenceSource[];
   tradeTimingPlan: TradeTimingPlan;
   rationale: string[];
 };
