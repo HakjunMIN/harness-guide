@@ -1398,20 +1398,50 @@ Create `apps/worker/src/worker/app.py`:
 
 ```python
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-from worker.domain import AIContextScore, InstrumentId, StrategyProfile
+from worker.domain import (
+    AIContextScore,
+    EvidenceSource,
+    EvidenceSourceType,
+    Finality,
+    InstrumentId,
+    StrategyProfile,
+)
 from worker.features import build_feature_set
 from worker.signal_decision import create_signal_decision
 
 app = FastAPI()
 
 
+class EvidenceSourceRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    source_id: str = Field(validation_alias=AliasChoices("source_id", "sourceId"))
+    source_type: EvidenceSourceType = Field(
+        validation_alias=AliasChoices("source_type", "sourceType")
+    )
+    title: str
+    url: str
+    observed_at: str = Field(validation_alias=AliasChoices("observed_at", "observedAt"))
+    finality: Finality
+
+
 class AnalysisRunRequest(BaseModel):
-    instrument_id: str
-    finality: str
+    model_config = ConfigDict(populate_by_name=True)
+
+    instrument_id: str = Field(
+        validation_alias=AliasChoices("instrument_id", "instrumentId")
+    )
+    finality: Finality
     bars: list[dict[str, float | str]]
-    ai_context: dict[str, float | int]
+    ai_context: dict[str, float | int] = Field(
+        validation_alias=AliasChoices("ai_context", "aiContext")
+    )
+    source_evidence: list[EvidenceSourceRequest] = Field(
+        min_length=1,
+        validation_alias=AliasChoices("source_evidence", "sourceEvidence"),
+    )
 
 
 @app.post("/analysis/run")
@@ -1420,7 +1450,7 @@ def run_analysis(request: AnalysisRunRequest) -> dict[str, object]:
     feature_set = build_feature_set(
         instrument_id=instrument_id,
         bars=request.bars,
-        finality=request.finality,  # type: ignore[arg-type]
+        finality=request.finality,
     )
     ai_context = AIContextScore(
         catalyst_score=float(request.ai_context["catalyst_score"]),
@@ -1434,6 +1464,17 @@ def run_analysis(request: AnalysisRunRequest) -> dict[str, object]:
         feature_set=feature_set,
         ai_context=ai_context,
         profile=StrategyProfile.default_swing_momentum(),
+        source_evidence=tuple(
+            EvidenceSource(
+                source_id=evidence.source_id,
+                source_type=evidence.source_type,
+                title=evidence.title,
+                url=evidence.url,
+                observed_at=evidence.observed_at,
+                finality=evidence.finality,
+            )
+            for evidence in request.source_evidence
+        ),
     )
 
     return {
@@ -1444,6 +1485,17 @@ def run_analysis(request: AnalysisRunRequest) -> dict[str, object]:
         "aiContribution": decision.ai_contribution,
         "aiWeightHaircut": decision.ai_weight_haircut,
         "qualityFlags": list(decision.quality_flags),
+        "sourceEvidence": [
+            {
+                "sourceId": evidence.source_id,
+                "sourceType": evidence.source_type,
+                "title": evidence.title,
+                "url": evidence.url,
+                "observedAt": evidence.observed_at,
+                "finality": evidence.finality,
+            }
+            for evidence in decision.source_evidence
+        ],
         "tradeTimingPlan": {
             "actionLabel": decision.trade_timing_plan.action_label,
             "entryZone": {
@@ -1512,25 +1564,49 @@ import { createAnalysisRunner } from "../src/modules/analysis-runner";
 
 describe("AnalysisRunner", () => {
   it("maps worker response into a SignalDecision", async () => {
+    const sourceEvidence = [
+      {
+        sourceId: "news-1",
+        sourceType: "news" as const,
+        title: "AAPL catalyst coverage",
+        url: "https://example.com/aapl-news",
+        observedAt: "2026-06-18T00:00:00.000Z",
+        finality: "confirmed" as const,
+      },
+      {
+        sourceId: "filing-1",
+        sourceType: "filing" as const,
+        title: "AAPL filing context",
+        url: "https://example.com/aapl-filing",
+        observedAt: "2026-06-18T00:00:00.000Z",
+        finality: "confirmed" as const,
+      },
+    ];
     const runner = createAnalysisRunner({
       workerUrl: "https://worker.example.test",
-      fetchJson: async () => ({
-        instrumentId: "US:XNAS:AAPL",
-        finality: "confirmed",
-        confidence: 0.75,
-        rulesContribution: 0.4,
-        aiContribution: 0.35,
-        aiWeightHaircut: 0,
-        qualityFlags: ["confirmed_end_of_day_data"],
-        tradeTimingPlan: {
-          actionLabel: "BUY",
-          entryZone: { low: 98, high: 102 },
-          stopLevel: 92,
-          targetZone: { low: 110, high: 116 },
-          timeHorizon: "days_to_weeks",
-        },
-        rationale: ["Rules contribution: 0.4"],
-      }),
+      fetchJson: async (_url, init) => {
+        const body = JSON.parse(init.body as string);
+        expect(body.sourceEvidence).toEqual(sourceEvidence);
+
+        return {
+          instrumentId: "US:XNAS:AAPL",
+          finality: "confirmed",
+          confidence: 0.75,
+          rulesContribution: 0.4,
+          aiContribution: 0.35,
+          aiWeightHaircut: 0,
+          qualityFlags: ["confirmed_end_of_day_data"],
+          sourceEvidence,
+          tradeTimingPlan: {
+            actionLabel: "BUY",
+            entryZone: { low: 98, high: 102 },
+            stopLevel: 92,
+            targetZone: { low: 110, high: 116 },
+            timeHorizon: "days_to_weeks",
+          },
+          rationale: ["Rules contribution: 0.4"],
+        };
+      },
     });
 
     const decision = await runner.runAnalysis({
@@ -1545,10 +1621,12 @@ describe("AnalysisRunner", () => {
         contradiction_count: 0,
         source_count: 3,
       },
+      sourceEvidence,
     });
 
     expect(decision.tradeTimingPlan.actionLabel).toBe("BUY");
     expect(decision.finality).toBe("confirmed");
+    expect(decision.sourceEvidence).toEqual(sourceEvidence);
   });
 });
 ```
@@ -1711,7 +1789,7 @@ Create `apps/web/src/modules/analysis-runner.ts`:
 
 ```typescript
 import type { DataFinality, InstrumentId, OhlcvBar, QualityFlag } from "../domain/market";
-import type { SignalDecision } from "../domain/signals";
+import type { EvidenceSource, SignalDecision } from "../domain/signals";
 
 type AnalysisRunRequest = {
   instrumentId: InstrumentId;
@@ -1725,6 +1803,7 @@ type AnalysisRunRequest = {
     contradiction_count: number;
     source_count: number;
   };
+  sourceEvidence: EvidenceSource[];
 };
 
 type AnalysisRunnerConfig = {
@@ -1757,6 +1836,7 @@ export function createAnalysisRunner(config: AnalysisRunnerConfig): AnalysisRunn
         aiContribution: response.aiContribution,
         aiWeightHaircut: response.aiWeightHaircut,
         qualityFlags: response.qualityFlags as QualityFlag[],
+        sourceEvidence: response.sourceEvidence,
         tradeTimingPlan: response.tradeTimingPlan,
         rationale: response.rationale,
       };

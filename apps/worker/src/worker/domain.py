@@ -5,6 +5,9 @@ fields, such as tradeTimingPlan, in later tasks.
 """
 
 from dataclasses import dataclass
+from math import isfinite
+from numbers import Integral, Real
+import re
 from typing import Literal
 
 
@@ -95,6 +98,27 @@ class AIContextScore:
     contradiction_count: int
     source_count: int
 
+    def __post_init__(self) -> None:
+        for field_name in (
+            "catalyst_score",
+            "uncertainty_score",
+            "evidence_quality_score",
+            "freshness_score",
+        ):
+            value = getattr(self, field_name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, Real)
+                or not isfinite(float(value))
+                or not 0 <= float(value) <= 1
+            ):
+                raise ValueError(f"{field_name} must be between 0 and 1")
+
+        for field_name in ("contradiction_count", "source_count"):
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, Integral) or value < 0:
+                raise ValueError(f"{field_name} must be greater than or equal to 0")
+
 
 @dataclass(frozen=True)
 class TradeTimingPlan:
@@ -129,3 +153,29 @@ class SignalDecision:
     source_evidence: tuple[EvidenceSource, ...]
     trade_timing_plan: TradeTimingPlan
     rationale: tuple[str, ...]
+
+
+def canonical_source_evidence_key(source: object) -> tuple[str, str] | None:
+    source_id = str(getattr(source, "source_id", "") or "").strip()
+    if source_id:
+        return ("source_id", source_id)
+
+    url = str(getattr(source, "url", "") or "").strip().rstrip("/").casefold()
+    title = re.sub(
+        r"\s+",
+        " ",
+        str(getattr(source, "title", "") or "").strip(),
+    ).casefold()
+    if not url or not title:
+        return None
+    return ("url_title", f"{url}|{title}")
+
+
+def distinct_source_evidence_count(sources: tuple[object, ...] | list[object]) -> int:
+    return len(
+        {
+            key
+            for source in sources
+            if (key := canonical_source_evidence_key(source)) is not None
+        }
+    )
