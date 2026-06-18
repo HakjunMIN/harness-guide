@@ -30,6 +30,8 @@ describe("domain language", () => {
 
   it("distinguishes Provisional Signal from Confirmed Signal", () => {
     expect(isProvisionalSignal({ finality: "provisional" })).toBe(true);
+    expect(isProvisionalSignal({ finality: "confirmed" })).toBe(false);
     expect(isConfirmedSignal({ finality: "confirmed" })).toBe(true);
+    expect(isConfirmedSignal({ finality: "provisional" })).toBe(false);
   });
 });

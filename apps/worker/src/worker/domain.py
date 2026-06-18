@@ -1,3 +1,9 @@
+"""Worker domain models use Python snake_case internally.
+
+The FastAPI boundary will map these models to the TypeScript camelCase response
+fields, such as tradeTimingPlan, in later tasks.
+"""
+
 from dataclasses import dataclass
 from typing import Literal
 
