@@ -16,6 +16,10 @@ _Avoid_: Client report, automatic recommendation
 An optional externally shareable report for advisor or asset-manager workflows, generated from approved research notes and portfolio context.
 _Avoid_: Research note, direct recommendation
 
+**Research Report Panel**:
+A focused internal section of a signal detail page that analyzes one aspect of an instrument, such as signal summary, technicals, AI context, portfolio impact, backtest support, or risk.
+_Avoid_: Client report, standalone recommendation
+
 **Trade Timing Plan**:
 A structured decision-support output containing an action signal, entry zone, stop level, target zone, and time horizon.
 _Avoid_: Single buy price, single sell price, automatic order
@@ -59,6 +63,26 @@ _Avoid_: Unqualified client recommendation
 **InstrumentId**:
 The canonical identity for a tradable stock, composed of market, exchange, and symbol.
 _Avoid_: Raw ticker, provider symbol
+
+**Stock Lookup**:
+A natural-language search mode for finding a specific tradable stock by company name, ticker, alias, or InstrumentId.
+_Avoid_: Screener, investment idea search
+
+**Investment Idea Screen**:
+A natural-language search mode for finding candidate stocks from market, sector, theme, signal, risk, or portfolio conditions, backed by structured criteria and cited evidence.
+_Avoid_: Stock lookup, chat answer
+
+**Screening Evidence**:
+The structured criteria and cited source material that explain why an instrument matched an Investment Idea Screen.
+_Avoid_: Tag-only match, uncited AI explanation
+
+**Search Intent**:
+The app's explicit interpretation of a natural-language query, including mode, market, instrument candidates, themes, signal filters, risk filters, and portfolio scope.
+_Avoid_: Raw prompt, hidden AI interpretation
+
+**Result Ranking Policy**:
+The ordering rule for search candidates, prioritizing Search Intent fit before signal confidence, evidence quality, portfolio relevance, and risk penalties.
+_Avoid_: Highest BUY score only, opaque relevance
 
 **Broker Connection**:
 A read-only integration that imports holdings and balances for portfolio analysis without placing, modifying, or cancelling orders.

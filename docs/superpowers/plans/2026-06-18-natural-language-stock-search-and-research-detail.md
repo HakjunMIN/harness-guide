@@ -2,136 +2,183 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build natural language stock search and a professional-grade signal detail page with report sections and typed visualization view models.
+**Goal:** Build a two-mode natural language search experience and a Recharts-based professional research detail page for Korean and US equities.
 
-**Architecture:** Add focused TypeScript modules under `apps/web/src/modules/` for natural language search, result assembly, research detail assembly, and visualization view models. Keep analysis-heavy signal calculation outside the UI modules; these modules assemble deterministic view models from typed sample data and existing domain concepts. Reuse the current Next.js app-router pages and Vitest tests.
+**Architecture:** Add a deterministic Search Intent seam that supports equal Stock Lookup and Investment Idea Screen modes. Assemble ranked search cards with Screening Evidence, then render a signal detail page with a fixed Signal Brief and Trade Timing summary plus tabbed Research Report Panels. Use Recharts from the start, but keep chart components fed by typed view models so signal calculation and visualization stay separate.
 
-**Tech Stack:** Next.js 15, React 19, TypeScript 5.6, Vitest 2.1, existing HTML-string rendering helpers, existing domain types in `apps/web/src/domain/`.
+**Tech Stack:** Next.js 15, React 19, TypeScript 5.6, Vitest 2.1, Recharts, existing HTML-string rendering helpers, existing domain types in `apps/web/src/domain/`.
 
 ## Global Constraints
 
-- Use canonical terms from `CONTEXT.md`: Investment Professional, Research Note, Client Report, Trade Timing Plan, Strategy Profile, Market Data Provider, Provisional Signal, Confirmed Signal, Strategy Backtest, Workspace, Portfolio, Alert Event, Action Label, InstrumentId, Broker Connection, AI Weight Haircut, Audit Log.
+- Use canonical terms from `CONTEXT.md`: Investment Professional, Research Note, Client Report, Research Report Panel, Trade Timing Plan, Strategy Profile, Market Data Provider, Provisional Signal, Confirmed Signal, Strategy Backtest, Workspace, Portfolio, Alert Event, Action Label, InstrumentId, Stock Lookup, Investment Idea Screen, Screening Evidence, Search Intent, Result Ranking Policy, Broker Connection, AI Weight Haircut, Audit Log.
 - The MVP supports Korean and US equities.
 - The trading horizon is swing trading over days to weeks.
 - The product is a professional decision-support system, not an automatic investment adviser or auto-trading system.
 - Broker Connections are read-only and must not place, modify, or cancel orders.
-- Compact dashboard surfaces may use BUY, HOLD, and SELL Action Labels; detail pages, Research Notes, and Client Reports must include evidence and professional-review context.
-- The search feature must make ambiguity, missing data, stale data, weak AI source evidence, contradictory evidence, and insufficient backtest samples visible.
+- Stock Lookup and Investment Idea Screen are equal search modes.
+- Ambiguous short queries use lookup-first behavior: show Stock Lookup results first and related Investment Idea Screen interpretations alongside them.
+- Investment Idea Screen matches require Screening Evidence: structured criteria plus cited EvidenceSource material; tag-only matches are weak evidence.
+- The MVP uses a deterministic rules-based Search Intent parser behind a stable Search Intent contract.
+- Result Ranking Policy order is Search Intent fit, Confirmed Signal confidence, Screening Evidence quality, portfolio relevance, then risk penalties.
+- Compact dashboard surfaces and the Signal Brief may use strong BUY, HOLD, and SELL Action Labels only with decision-support copy, Review Required conditions, and conflicting or risk evidence.
+- If Portfolio data is unavailable, search still runs, Portfolio Impact Report Panel is unavailable, and portfolio conditions are marked as excluded from ranking.
 - Client Reports can be drafted only from approved Research Notes and portfolio context.
 
 ---
 
 ## File Structure
 
-- Create: `apps/web/src/modules/natural-language-search.ts`
-  - Owns `SearchIntent`, `InstrumentSearchCandidate`, `NaturalLanguageSearchResult`, deterministic instrument catalog, and query parsing.
+- Modify: `apps/web/package.json`
+  - Adds the Recharts dependency.
+- Create: `apps/web/src/modules/search-intent.ts`
+  - Owns `SearchIntent`, `SearchMode`, parser output, ambiguity, and no-match guidance.
+- Create: `apps/web/src/modules/instrument-search.ts`
+  - Owns deterministic instrument catalog, Stock Lookup, Investment Idea Screen candidate resolution, Screening Evidence, and lookup-first merge behavior.
 - Create: `apps/web/src/modules/search-result-assembler.ts`
-  - Owns ranked search result card view models that combine search candidates with signal and portfolio context.
+  - Owns Search Result cards and the Result Ranking Policy.
 - Create: `apps/web/src/modules/research-detail.ts`
-  - Owns the report-grade signal detail view model and HTML rendering for the detail page.
-- Create: `apps/web/src/modules/visualizations.ts`
-  - Owns typed chart view models for price, technical indicators, contribution, risk, backtest, and portfolio exposure.
-- Create: `apps/web/tests/natural-language-search.test.ts`
-  - Tests query parsing, exact lookup, thematic lookup, portfolio intent, ambiguity, and no-match behavior.
+  - Owns the report-grade detail view model and HTML shell for fixed summary plus tabbed Research Report Panels.
+- Create: `apps/web/src/modules/research-charts.tsx`
+  - Owns Recharts React components for price/volume, indicators, contribution, risk, backtest, and portfolio exposure.
+- Create: `apps/web/src/modules/research-chart-models.ts`
+  - Owns chart-ready view models and unavailable states.
+- Create: `apps/web/tests/search-intent.test.ts`
+  - Tests mode parsing, lookup-first ambiguity, and no-match guidance.
+- Create: `apps/web/tests/instrument-search.test.ts`
+  - Tests Stock Lookup, Investment Idea Screen, Screening Evidence, and portfolio-unavailable behavior.
 - Create: `apps/web/tests/search-result-assembler.test.ts`
-  - Tests ranked cards, match reasons, quality flags, and professional context.
+  - Tests Result Ranking Policy and search cards.
 - Create: `apps/web/tests/research-detail.test.ts`
-  - Tests all required detail sections and unavailable states.
-- Create: `apps/web/tests/visualizations.test.ts`
-  - Tests chart view model data and explicit unavailable states.
+  - Tests fixed summary, Research Report Panels, decision-support copy, and unavailable states.
+- Create: `apps/web/tests/research-chart-models.test.ts`
+  - Tests chart-ready data and unavailable states.
+- Create: `apps/web/tests/research-charts.test.tsx`
+  - Tests Recharts components render accessible panel labels from view models.
 - Modify: `apps/web/src/modules/dashboard-summary.ts`
-  - Adds natural language search form rendering, query interpretation, and search result cards.
+  - Renders the two-mode search surface, interpreted Search Intent, lookup-first results, and related screen interpretations.
 - Modify: `apps/web/tests/dashboard.test.ts`
-  - Updates dashboard expectations for search and result cards.
+  - Tests the dashboard integration.
 - Modify: `apps/web/app/page.tsx`
-  - Reads `searchParams.q`, runs deterministic natural language search, assembles result cards, and renders dashboard HTML.
+  - Reads `searchParams.q`, builds Search Intent and results, and renders dashboard HTML.
 - Modify: `apps/web/app/signals/[instrumentId]/page.tsx`
-  - Renders the full professional signal detail page using `research-detail.ts`.
+  - Renders the full professional research detail page.
 
 ---
 
-### Task 1: NaturalLanguageSearch module
+### Task 1: Add Recharts and test setup
 
 **Files:**
-- Create: `apps/web/src/modules/natural-language-search.ts`
-- Create: `apps/web/tests/natural-language-search.test.ts`
+- Modify: `apps/web/package.json`
+- Modify: `package-lock.json`
 
 **Interfaces:**
-- Consumes: `InstrumentId`, `Market`, `QualityFlag` from `apps/web/src/domain/market.ts`
+- Produces: installed `recharts` package for `apps/web/src/modules/research-charts.tsx`.
+
+- [ ] **Step 1: Add Recharts with npm**
+
+Run:
+
+```bash
+npm --prefix apps/web install recharts
+```
+
+Expected: `apps/web/package.json` includes `"recharts"` in `dependencies`, and `package-lock.json` is updated.
+
+- [ ] **Step 2: Run current web tests**
+
+Run:
+
+```bash
+npm --prefix apps/web test -- --run
+```
+
+Expected: PASS. If existing tests fail before feature work, stop and report the baseline failure.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add apps/web/package.json package-lock.json
+git commit -m "chore: add recharts for research visualizations"
+```
+
+---
+
+### Task 2: Search Intent parser
+
+**Files:**
+- Create: `apps/web/src/modules/search-intent.ts`
+- Create: `apps/web/tests/search-intent.test.ts`
+
+**Interfaces:**
 - Produces:
+  - `type SearchMode = "stock_lookup" | "investment_idea_screen"`
+  - `type SearchIntentFilter = "company" | "ticker" | "market" | "sector" | "theme" | "signal_state" | "risk" | "portfolio_risk"`
   - `type SearchIntent`
-  - `type SearchIntentFilter`
-  - `type InstrumentSearchCandidate`
-  - `type NaturalLanguageSearchResult`
-  - `function searchInstruments(query: string): NaturalLanguageSearchResult`
+  - `function parseSearchIntent(query: string): SearchIntent`
+  - `function describeSearchIntent(intent: SearchIntent): string[]`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `apps/web/tests/natural-language-search.test.ts`:
+Create `apps/web/tests/search-intent.test.ts`:
 
 ```typescript
 import { describe, expect, it } from "vitest";
-import { searchInstruments } from "../src/modules/natural-language-search";
+import { describeSearchIntent, parseSearchIntent } from "../src/modules/search-intent";
 
-describe("NaturalLanguageSearch", () => {
-  it("resolves exact company and ticker queries to canonical InstrumentIds", () => {
-    const samsung = searchInstruments("삼성전자");
-    const apple = searchInstruments("AAPL");
-
-    expect(samsung.intent.rawQuery).toBe("삼성전자");
-    expect(samsung.candidates[0]).toMatchObject({
-      instrumentId: "KR:XKRX:005930",
-      displayName: "Samsung Electronics",
-      matchReasons: ["company_alias_match"],
+describe("Search Intent", () => {
+  it("parses Stock Lookup intent for company and ticker queries", () => {
+    expect(parseSearchIntent("삼성전자")).toMatchObject({
+      rawQuery: "삼성전자",
+      primaryMode: "stock_lookup",
+      modes: ["stock_lookup"],
+      filters: ["company"],
     });
-    expect(apple.candidates[0]).toMatchObject({
-      instrumentId: "US:XNAS:AAPL",
-      displayName: "Apple",
-      matchReasons: ["ticker_match"],
+
+    expect(parseSearchIntent("AAPL")).toMatchObject({
+      primaryMode: "stock_lookup",
+      modes: ["stock_lookup"],
+      filters: ["ticker"],
     });
   });
 
-  it("parses market, theme, and signal filters from thematic prompts", () => {
-    const result = searchInstruments("US AI infrastructure BUY candidates");
+  it("parses Investment Idea Screen intent for thematic prompts", () => {
+    const intent = parseSearchIntent("US AI infrastructure BUY candidates");
 
-    expect(result.intent.market).toBe("US");
-    expect(result.intent.filters).toContain("theme");
-    expect(result.intent.filters).toContain("signal_state");
-    expect(result.intent.themes).toContain("ai_infrastructure");
-    expect(result.intent.actionLabels).toContain("BUY");
-    expect(result.candidates.map((candidate) => candidate.instrumentId)).toContain("US:XNAS:NVDA");
-  });
-
-  it("recognizes portfolio-risk searches and returns portfolio-scoped intent", () => {
-    const result = searchInstruments("내 포트폴리오에서 손절 가까운 종목");
-
-    expect(result.intent.portfolioScope).toBe("selected_portfolio");
-    expect(result.intent.filters).toContain("portfolio_risk");
-    expect(result.candidates[0].matchReasons).toContain("portfolio_risk_match");
-  });
-
-  it("returns ambiguity metadata when a query maps to multiple instruments", () => {
-    const result = searchInstruments("삼성");
-
-    expect(result.ambiguity).toEqual({
-      message: "Query can map to multiple instruments.",
-      candidateInstrumentIds: ["KR:XKRX:005930", "KR:XKRX:000830"],
+    expect(intent).toMatchObject({
+      primaryMode: "investment_idea_screen",
+      modes: ["investment_idea_screen"],
+      market: "US",
     });
-    expect(result.candidates).toHaveLength(2);
+    expect(intent.filters).toEqual(["market", "theme", "signal_state"]);
+    expect(intent.themes).toEqual(["ai_infrastructure"]);
+    expect(intent.actionLabels).toEqual(["BUY"]);
   });
 
-  it("returns understood terms and suggested refinements when nothing matches", () => {
-    const result = searchInstruments("unknown quantum banana stock");
+  it("uses lookup-first ambiguity for short company-family queries", () => {
+    const intent = parseSearchIntent("삼성");
 
-    expect(result.candidates).toEqual([]);
-    expect(result.noMatch).toEqual({
-      understoodTerms: ["unknown", "quantum", "banana", "stock"],
-      suggestedPrompts: [
-        "Try a company name such as Samsung Electronics or Apple.",
-        "Try a ticker such as 005930 or AAPL.",
-        "Try a professional screen such as US AI infrastructure BUY candidates.",
-      ],
-    });
+    expect(intent.primaryMode).toBe("stock_lookup");
+    expect(intent.modes).toEqual(["stock_lookup", "investment_idea_screen"]);
+    expect(intent.ambiguity).toEqual("lookup_first");
+  });
+
+  it("keeps portfolio searches runnable when portfolio context is unavailable", () => {
+    const intent = parseSearchIntent("내 포트폴리오에서 손절 가까운 종목");
+
+    expect(intent.primaryMode).toBe("investment_idea_screen");
+    expect(intent.filters).toContain("portfolio_risk");
+    expect(intent.portfolioScope).toBe("selected_portfolio");
+  });
+
+  it("describes the visible interpretation shown to the user", () => {
+    const description = describeSearchIntent(parseSearchIntent("US AI infrastructure BUY candidates"));
+
+    expect(description).toEqual([
+      "Mode: Investment Idea Screen",
+      "Market: US",
+      "Themes: ai_infrastructure",
+      "Action Labels: BUY",
+    ]);
   });
 });
 ```
@@ -141,18 +188,20 @@ describe("NaturalLanguageSearch", () => {
 Run:
 
 ```bash
-npm --prefix apps/web test -- --run tests/natural-language-search.test.ts
+npm --prefix apps/web test -- --run tests/search-intent.test.ts
 ```
 
-Expected: FAIL with a module resolution error for `../src/modules/natural-language-search`.
+Expected: FAIL with a module resolution error for `../src/modules/search-intent`.
 
-- [ ] **Step 3: Implement the NaturalLanguageSearch module**
+- [ ] **Step 3: Implement the Search Intent parser**
 
-Create `apps/web/src/modules/natural-language-search.ts`:
+Create `apps/web/src/modules/search-intent.ts`:
 
 ```typescript
-import type { InstrumentId, Market, QualityFlag } from "../domain/market";
+import type { Market } from "../domain/market";
 import type { ActionLabel } from "../domain/signals";
+
+export type SearchMode = "stock_lookup" | "investment_idea_screen";
 
 export type SearchIntentFilter =
   | "company"
@@ -167,13 +216,282 @@ export type SearchIntentFilter =
 export type SearchIntent = {
   rawQuery: string;
   normalizedQuery: string;
-  market?: Market;
+  primaryMode: SearchMode;
+  modes: SearchMode[];
   filters: SearchIntentFilter[];
+  market?: Market;
   themes: string[];
   sectors: string[];
   actionLabels: ActionLabel[];
   portfolioScope?: "selected_portfolio";
+  ambiguity?: "lookup_first";
 };
+
+const knownCompanyTerms = ["삼성전자", "삼성", "samsung", "apple", "aapl", "nvidia", "nvda"];
+
+export function parseSearchIntent(query: string): SearchIntent {
+  const rawQuery = query.trim();
+  const normalizedQuery = rawQuery.toLowerCase();
+  const filters = new Set<SearchIntentFilter>();
+  const themes = new Set<string>();
+  const sectors = new Set<string>();
+  const actionLabels = new Set<ActionLabel>();
+  const modes = new Set<SearchMode>();
+  let market: Market | undefined;
+  let portfolioScope: "selected_portfolio" | undefined;
+
+  if (/\b(us|미국|nasdaq|nyse)\b/.test(normalizedQuery)) {
+    market = "US";
+    filters.add("market");
+    modes.add("investment_idea_screen");
+  }
+
+  if (/\b(kr|korea|한국|국내|코스피|코스닥)\b/.test(normalizedQuery)) {
+    market = "KR";
+    filters.add("market");
+    modes.add("investment_idea_screen");
+  }
+
+  if (/\b(ai|infrastructure|인공지능|인프라)\b/.test(normalizedQuery)) {
+    themes.add("ai_infrastructure");
+    filters.add("theme");
+    modes.add("investment_idea_screen");
+  }
+
+  if (/\b(dividend|배당)\b/.test(normalizedQuery)) {
+    themes.add("dividend_stability");
+    filters.add("theme");
+    modes.add("investment_idea_screen");
+  }
+
+  if (/\b(semiconductor|반도체)\b/.test(normalizedQuery)) {
+    sectors.add("semiconductors");
+    filters.add("sector");
+    modes.add("investment_idea_screen");
+  }
+
+  if (/\b(buy|매수)\b/.test(normalizedQuery)) {
+    actionLabels.add("BUY");
+    filters.add("signal_state");
+    modes.add("investment_idea_screen");
+  }
+
+  if (/\b(hold|보유|관망)\b/.test(normalizedQuery)) {
+    actionLabels.add("HOLD");
+    filters.add("signal_state");
+    modes.add("investment_idea_screen");
+  }
+
+  if (/\b(sell|매도)\b/.test(normalizedQuery)) {
+    actionLabels.add("SELL");
+    filters.add("signal_state");
+    modes.add("investment_idea_screen");
+  }
+
+  if (/\b(portfolio|holding|holdings|포트폴리오|보유|손절|리스크|risk)\b/.test(normalizedQuery)) {
+    portfolioScope = "selected_portfolio";
+    filters.add("portfolio_risk");
+    modes.add("investment_idea_screen");
+  }
+
+  if (/^[a-z]{1,5}$/.test(normalizedQuery) || /^\d{6}$/.test(normalizedQuery)) {
+    filters.add("ticker");
+    modes.add("stock_lookup");
+  }
+
+  if (knownCompanyTerms.some((term) => normalizedQuery.includes(term))) {
+    filters.add("company");
+    modes.add("stock_lookup");
+  }
+
+  if (modes.size === 0) {
+    modes.add("stock_lookup");
+  }
+
+  const ambiguity = normalizedQuery === "삼성" || normalizedQuery === "samsung" ? "lookup_first" : undefined;
+  if (ambiguity) {
+    modes.add("investment_idea_screen");
+  }
+
+  const modeList = orderModes(Array.from(modes), ambiguity);
+
+  return {
+    rawQuery,
+    normalizedQuery,
+    primaryMode: modeList[0],
+    modes: modeList,
+    filters: Array.from(filters),
+    ...(market ? { market } : {}),
+    themes: Array.from(themes),
+    sectors: Array.from(sectors),
+    actionLabels: Array.from(actionLabels),
+    ...(portfolioScope ? { portfolioScope } : {}),
+    ...(ambiguity ? { ambiguity } : {}),
+  };
+}
+
+export function describeSearchIntent(intent: SearchIntent): string[] {
+  const lines = [`Mode: ${formatMode(intent.primaryMode)}`];
+  if (intent.market) {
+    lines.push(`Market: ${intent.market}`);
+  }
+  if (intent.themes.length > 0) {
+    lines.push(`Themes: ${intent.themes.join(", ")}`);
+  }
+  if (intent.actionLabels.length > 0) {
+    lines.push(`Action Labels: ${intent.actionLabels.join(", ")}`);
+  }
+  if (intent.portfolioScope) {
+    lines.push("Portfolio Scope: selected portfolio");
+  }
+  return lines;
+}
+
+function orderModes(modes: SearchMode[], ambiguity?: "lookup_first"): SearchMode[] {
+  if (ambiguity) {
+    return ["stock_lookup", "investment_idea_screen"];
+  }
+  if (modes.includes("investment_idea_screen") && !modes.includes("stock_lookup")) {
+    return ["investment_idea_screen"];
+  }
+  if (modes.includes("stock_lookup") && !modes.includes("investment_idea_screen")) {
+    return ["stock_lookup"];
+  }
+  return ["stock_lookup", "investment_idea_screen"];
+}
+
+function formatMode(mode: SearchMode): string {
+  return mode === "stock_lookup" ? "Stock Lookup" : "Investment Idea Screen";
+}
+```
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run:
+
+```bash
+npm --prefix apps/web test -- --run tests/search-intent.test.ts
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/web/src/modules/search-intent.ts apps/web/tests/search-intent.test.ts
+git commit -m "feat: parse stock search intent"
+```
+
+---
+
+### Task 3: Instrument search and Screening Evidence
+
+**Files:**
+- Create: `apps/web/src/modules/instrument-search.ts`
+- Create: `apps/web/tests/instrument-search.test.ts`
+
+**Interfaces:**
+- Consumes:
+  - `parseSearchIntent(query: string): SearchIntent`
+- Produces:
+  - `type ScreeningEvidence`
+  - `type InstrumentSearchCandidate`
+  - `type InstrumentSearchResult`
+  - `function searchInstruments(query: string, options?: { portfolioAvailable?: boolean }): InstrumentSearchResult`
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `apps/web/tests/instrument-search.test.ts`:
+
+```typescript
+import { describe, expect, it } from "vitest";
+import { searchInstruments } from "../src/modules/instrument-search";
+
+describe("Instrument search", () => {
+  it("returns Stock Lookup matches for company and ticker queries", () => {
+    expect(searchInstruments("삼성전자").primaryCandidates[0]).toMatchObject({
+      instrumentId: "KR:XKRX:005930",
+      displayName: "Samsung Electronics",
+      primaryMode: "stock_lookup",
+      matchReasons: ["company_alias_match"],
+    });
+
+    expect(searchInstruments("AAPL").primaryCandidates[0]).toMatchObject({
+      instrumentId: "US:XNAS:AAPL",
+      displayName: "Apple",
+      primaryMode: "stock_lookup",
+      matchReasons: ["ticker_match"],
+    });
+  });
+
+  it("returns lookup-first primary candidates and related screen candidates for ambiguous queries", () => {
+    const result = searchInstruments("삼성");
+
+    expect(result.intent.ambiguity).toBe("lookup_first");
+    expect(result.primaryCandidates.map((candidate) => candidate.instrumentId)).toEqual([
+      "KR:XKRX:005930",
+      "KR:XKRX:000830",
+    ]);
+    expect(result.relatedScreenCandidates.map((candidate) => candidate.instrumentId)).toContain("KR:XKRX:005930");
+  });
+
+  it("requires structured criteria and cited evidence for Investment Idea Screen matches", () => {
+    const result = searchInstruments("US AI infrastructure BUY candidates");
+    const nvidia = result.primaryCandidates[0];
+
+    expect(nvidia.primaryMode).toBe("investment_idea_screen");
+    expect(nvidia.screeningEvidence).toMatchObject({
+      quality: "strong",
+      structuredCriteria: ["theme:ai_infrastructure", "action:BUY", "market:US"],
+    });
+    expect(nvidia.screeningEvidence?.sources[0]).toMatchObject({
+      sourceType: "news",
+      title: "AI infrastructure demand update",
+      finality: "confirmed",
+    });
+  });
+
+  it("marks tag-only screen matches as weak Screening Evidence", () => {
+    const result = searchInstruments("배당 안정적인 한국 대형주");
+
+    expect(result.primaryCandidates[0].screeningEvidence).toMatchObject({
+      quality: "weak",
+      weaknessReason: "Matched by structured criteria without enough cited source material.",
+    });
+  });
+
+  it("keeps portfolio searches runnable when Portfolio is unavailable", () => {
+    const result = searchInstruments("내 포트폴리오에서 손절 가까운 종목", {
+      portfolioAvailable: false,
+    });
+
+    expect(result.portfolioState).toEqual({
+      available: false,
+      message: "Portfolio unavailable; portfolio conditions were not included in ranking.",
+    });
+    expect(result.primaryCandidates.length).toBeGreaterThan(0);
+  });
+});
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run:
+
+```bash
+npm --prefix apps/web test -- --run tests/instrument-search.test.ts
+```
+
+Expected: FAIL with a module resolution error for `../src/modules/instrument-search`.
+
+- [ ] **Step 3: Implement instrument search**
+
+Create `apps/web/src/modules/instrument-search.ts`:
+
+```typescript
+import type { InstrumentId, Market, QualityFlag } from "../domain/market";
+import type { EvidenceSource } from "../domain/signals";
+import { parseSearchIntent, type SearchIntent, type SearchMode } from "./search-intent";
 
 export type MatchReason =
   | "ticker_match"
@@ -182,23 +500,33 @@ export type MatchReason =
   | "signal_filter_match"
   | "portfolio_risk_match";
 
+export type ScreeningEvidence = {
+  quality: "strong" | "weak";
+  structuredCriteria: string[];
+  sources: EvidenceSource[];
+  weaknessReason?: string;
+};
+
 export type InstrumentSearchCandidate = {
   instrumentId: InstrumentId;
   displayName: string;
   market: Market;
   ticker: string;
+  primaryMode: SearchMode;
   themes: string[];
   sectors: string[];
   matchReasons: MatchReason[];
   qualityFlags: QualityFlag[];
+  screeningEvidence?: ScreeningEvidence;
 };
 
-export type NaturalLanguageSearchResult = {
+export type InstrumentSearchResult = {
   intent: SearchIntent;
-  candidates: InstrumentSearchCandidate[];
-  ambiguity?: {
-    message: string;
-    candidateInstrumentIds: InstrumentId[];
+  primaryCandidates: InstrumentSearchCandidate[];
+  relatedScreenCandidates: InstrumentSearchCandidate[];
+  portfolioState: {
+    available: boolean;
+    message?: string;
   };
   noMatch?: {
     understoodTerms: string[];
@@ -218,65 +546,45 @@ type InstrumentCatalogEntry = {
 };
 
 const catalog: InstrumentCatalogEntry[] = [
-  {
-    instrumentId: "KR:XKRX:005930",
-    displayName: "Samsung Electronics",
-    market: "KR",
-    ticker: "005930",
-    aliases: ["samsung electronics", "samsung", "삼성전자", "삼성"],
-    themes: ["ai_infrastructure", "memory_semiconductor", "korea_large_cap"],
-    sectors: ["semiconductors", "hardware"],
-    defaultQualityFlags: ["confirmed_end_of_day_data"],
-  },
-  {
-    instrumentId: "KR:XKRX:000830",
-    displayName: "Samsung C&T",
-    market: "KR",
-    ticker: "000830",
-    aliases: ["samsung c&t", "samsung", "삼성물산", "삼성"],
-    themes: ["korea_large_cap", "dividend_stability"],
-    sectors: ["industrials"],
-    defaultQualityFlags: ["confirmed_end_of_day_data"],
-  },
-  {
-    instrumentId: "US:XNAS:AAPL",
-    displayName: "Apple",
-    market: "US",
-    ticker: "AAPL",
-    aliases: ["apple", "aapl", "애플"],
-    themes: ["quality_growth", "consumer_ai"],
-    sectors: ["hardware", "consumer_technology"],
-    defaultQualityFlags: ["confirmed_end_of_day_data"],
-  },
-  {
-    instrumentId: "US:XNAS:NVDA",
-    displayName: "NVIDIA",
-    market: "US",
-    ticker: "NVDA",
-    aliases: ["nvidia", "nvda", "엔비디아"],
-    themes: ["ai_infrastructure", "semiconductors"],
-    sectors: ["semiconductors"],
-    defaultQualityFlags: ["high_volatility"],
-  },
+  entry("KR:XKRX:005930", "Samsung Electronics", "KR", "005930", ["samsung electronics", "samsung", "삼성전자", "삼성"], ["ai_infrastructure", "memory_semiconductor", "korea_large_cap"], ["semiconductors", "hardware"], ["confirmed_end_of_day_data"]),
+  entry("KR:XKRX:000830", "Samsung C&T", "KR", "000830", ["samsung c&t", "samsung", "삼성물산", "삼성"], ["korea_large_cap", "dividend_stability"], ["industrials"], ["confirmed_end_of_day_data"]),
+  entry("US:XNAS:AAPL", "Apple", "US", "AAPL", ["apple", "aapl", "애플"], ["quality_growth", "consumer_ai"], ["hardware", "consumer_technology"], ["confirmed_end_of_day_data"]),
+  entry("US:XNAS:NVDA", "NVIDIA", "US", "NVDA", ["nvidia", "nvda", "엔비디아"], ["ai_infrastructure", "semiconductors"], ["semiconductors"], ["high_volatility"]),
 ];
 
-export function searchInstruments(query: string): NaturalLanguageSearchResult {
-  const rawQuery = query.trim();
-  const normalizedQuery = normalize(rawQuery);
-  const intent = parseIntent(rawQuery, normalizedQuery);
-  const candidates = collectCandidates(normalizedQuery, intent);
-  const ambiguity = buildAmbiguity(normalizedQuery, candidates);
+export function searchInstruments(
+  query: string,
+  options: { portfolioAvailable?: boolean } = {},
+): InstrumentSearchResult {
+  const intent = parseSearchIntent(query);
+  const portfolioAvailable = options.portfolioAvailable !== false;
+  const allCandidates = intent.modes.flatMap((mode) => collectCandidates(intent, mode, portfolioAvailable));
+  const primaryCandidates = uniqueCandidates(
+    allCandidates.filter((candidate) => candidate.primaryMode === intent.primaryMode),
+  );
+  const relatedScreenCandidates = uniqueCandidates(
+    allCandidates.filter((candidate) => candidate.primaryMode === "investment_idea_screen"),
+  );
 
-  if (candidates.length === 0) {
+  const portfolioState = {
+    available: portfolioAvailable,
+    ...(!portfolioAvailable
+      ? { message: "Portfolio unavailable; portfolio conditions were not included in ranking." }
+      : {}),
+  };
+
+  if (primaryCandidates.length === 0 && relatedScreenCandidates.length === 0) {
     return {
       intent,
-      candidates,
+      primaryCandidates,
+      relatedScreenCandidates,
+      portfolioState,
       noMatch: {
-        understoodTerms: normalizedQuery.split(/\s+/).filter(Boolean),
+        understoodTerms: intent.normalizedQuery.split(/\s+/).filter(Boolean),
         suggestedPrompts: [
-          "Try a company name such as Samsung Electronics or Apple.",
-          "Try a ticker such as 005930 or AAPL.",
-          "Try a professional screen such as US AI infrastructure BUY candidates.",
+          "Try Stock Lookup with Samsung Electronics, Apple, 005930, or AAPL.",
+          "Try Investment Idea Screen with US AI infrastructure BUY candidates.",
+          "Try a portfolio query after importing or selecting a Portfolio.",
         ],
       },
     };
@@ -284,147 +592,128 @@ export function searchInstruments(query: string): NaturalLanguageSearchResult {
 
   return {
     intent,
-    candidates,
-    ...(ambiguity ? { ambiguity } : {}),
-  };
-}
-
-function parseIntent(rawQuery: string, normalizedQuery: string): SearchIntent {
-  const filters = new Set<SearchIntentFilter>();
-  const themes = new Set<string>();
-  const sectors = new Set<string>();
-  const actionLabels = new Set<ActionLabel>();
-  let market: Market | undefined;
-  let portfolioScope: "selected_portfolio" | undefined;
-
-  if (/\b(us|미국|nasdaq|nyse)\b/.test(normalizedQuery)) {
-    market = "US";
-    filters.add("market");
-  }
-  if (/\b(kr|korea|한국|국내|코스피|코스닥)\b/.test(normalizedQuery)) {
-    market = "KR";
-    filters.add("market");
-  }
-  if (/\b(ai|infrastructure|인공지능|인프라)\b/.test(normalizedQuery)) {
-    themes.add("ai_infrastructure");
-    filters.add("theme");
-  }
-  if (/\b(dividend|배당)\b/.test(normalizedQuery)) {
-    themes.add("dividend_stability");
-    filters.add("theme");
-  }
-  if (/\b(semiconductor|반도체)\b/.test(normalizedQuery)) {
-    sectors.add("semiconductors");
-    filters.add("sector");
-  }
-  if (/\b(buy|매수)\b/.test(normalizedQuery)) {
-    actionLabels.add("BUY");
-    filters.add("signal_state");
-  }
-  if (/\b(hold|보유|관망)\b/.test(normalizedQuery)) {
-    actionLabels.add("HOLD");
-    filters.add("signal_state");
-  }
-  if (/\b(sell|매도)\b/.test(normalizedQuery)) {
-    actionLabels.add("SELL");
-    filters.add("signal_state");
-  }
-  if (/\b(portfolio|holding|holdings|포트폴리오|보유|손절|리스크)\b/.test(normalizedQuery)) {
-    portfolioScope = "selected_portfolio";
-    filters.add("portfolio_risk");
-  }
-  if (catalog.some((entry) => normalizedQuery.includes(normalize(entry.ticker)))) {
-    filters.add("ticker");
-  }
-  if (catalog.some((entry) => entry.aliases.some((alias) => normalizedQuery.includes(normalize(alias))))) {
-    filters.add("company");
-  }
-
-  return {
-    rawQuery,
-    normalizedQuery,
-    ...(market ? { market } : {}),
-    filters: Array.from(filters),
-    themes: Array.from(themes),
-    sectors: Array.from(sectors),
-    actionLabels: Array.from(actionLabels),
-    ...(portfolioScope ? { portfolioScope } : {}),
+    primaryCandidates,
+    relatedScreenCandidates,
+    portfolioState,
   };
 }
 
 function collectCandidates(
-  normalizedQuery: string,
   intent: SearchIntent,
+  mode: SearchMode,
+  portfolioAvailable: boolean,
 ): InstrumentSearchCandidate[] {
   return catalog
-    .map((entry) => {
-      const matchReasons = collectMatchReasons(entry, normalizedQuery, intent);
-      return { entry, matchReasons };
+    .map((item) => {
+      const matchReasons = collectMatchReasons(item, intent, mode, portfolioAvailable);
+      return { item, matchReasons };
     })
-    .filter(({ entry, matchReasons }) => {
-      if (intent.market && entry.market !== intent.market) {
+    .filter(({ item, matchReasons }) => {
+      if (intent.market && item.market !== intent.market) {
         return false;
       }
       return matchReasons.length > 0;
     })
-    .map(({ entry, matchReasons }) => ({
-      instrumentId: entry.instrumentId,
-      displayName: entry.displayName,
-      market: entry.market,
-      ticker: entry.ticker,
-      themes: entry.themes,
-      sectors: entry.sectors,
+    .map(({ item, matchReasons }) => ({
+      instrumentId: item.instrumentId,
+      displayName: item.displayName,
+      market: item.market,
+      ticker: item.ticker,
+      primaryMode: mode,
+      themes: item.themes,
+      sectors: item.sectors,
       matchReasons,
-      qualityFlags: entry.defaultQualityFlags,
+      qualityFlags: item.defaultQualityFlags,
+      ...(mode === "investment_idea_screen" ? { screeningEvidence: buildScreeningEvidence(item, intent) } : {}),
     }));
 }
 
 function collectMatchReasons(
-  entry: InstrumentCatalogEntry,
-  normalizedQuery: string,
+  item: InstrumentCatalogEntry,
   intent: SearchIntent,
+  mode: SearchMode,
+  portfolioAvailable: boolean,
 ): MatchReason[] {
   const reasons = new Set<MatchReason>();
-  const normalizedTicker = normalize(entry.ticker);
-
-  if (normalizedQuery === normalizedTicker || normalizedQuery.includes(normalizedTicker)) {
-    reasons.add("ticker_match");
+  if (mode === "stock_lookup") {
+    if (intent.normalizedQuery === item.ticker.toLowerCase() || intent.normalizedQuery.includes(item.ticker.toLowerCase())) {
+      reasons.add("ticker_match");
+    }
+    if (item.aliases.some((alias) => intent.normalizedQuery.includes(alias.toLowerCase()))) {
+      reasons.add("company_alias_match");
+    }
   }
-  if (entry.aliases.some((alias) => normalizedQuery.includes(normalize(alias)))) {
-    reasons.add("company_alias_match");
+  if (mode === "investment_idea_screen") {
+    if (intent.themes.some((theme) => item.themes.includes(theme))) {
+      reasons.add("theme_match");
+    }
+    if (intent.sectors.some((sector) => item.sectors.includes(sector))) {
+      reasons.add("theme_match");
+    }
+    if (intent.actionLabels.length > 0 && item.themes.includes("ai_infrastructure")) {
+      reasons.add("signal_filter_match");
+    }
+    if (intent.portfolioScope && portfolioAvailable && item.instrumentId === "KR:XKRX:005930") {
+      reasons.add("portfolio_risk_match");
+    }
+    if (intent.portfolioScope && !portfolioAvailable && item.instrumentId === "KR:XKRX:005930") {
+      reasons.add("theme_match");
+    }
   }
-  if (intent.themes.some((theme) => entry.themes.includes(theme))) {
-    reasons.add("theme_match");
-  }
-  if (intent.sectors.some((sector) => entry.sectors.includes(sector))) {
-    reasons.add("theme_match");
-  }
-  if (intent.actionLabels.length > 0 && entry.themes.some((theme) => theme === "ai_infrastructure")) {
-    reasons.add("signal_filter_match");
-  }
-  if (intent.portfolioScope && entry.instrumentId === "KR:XKRX:005930") {
-    reasons.add("portfolio_risk_match");
-  }
-
   return Array.from(reasons);
 }
 
-function buildAmbiguity(
-  normalizedQuery: string,
-  candidates: InstrumentSearchCandidate[],
-): NaturalLanguageSearchResult["ambiguity"] {
-  const isShortSamsungQuery = normalizedQuery === "삼성" || normalizedQuery === "samsung";
-  if (!isShortSamsungQuery || candidates.length < 2) {
-    return undefined;
-  }
+function buildScreeningEvidence(
+  item: InstrumentCatalogEntry,
+  intent: SearchIntent,
+): ScreeningEvidence {
+  const structuredCriteria = [
+    ...intent.themes.map((theme) => `theme:${theme}`),
+    ...intent.actionLabels.map((label) => `action:${label}`),
+    ...(intent.market ? [`market:${intent.market}`] : []),
+  ];
+  const strong = item.instrumentId === "US:XNAS:NVDA" && intent.themes.includes("ai_infrastructure");
   return {
-    message: "Query can map to multiple instruments.",
-    candidateInstrumentIds: candidates.map((candidate) => candidate.instrumentId),
+    quality: strong ? "strong" : "weak",
+    structuredCriteria,
+    sources: strong
+      ? [
+          {
+            sourceType: "news",
+            title: "AI infrastructure demand update",
+            url: "https://example.com/ai-infrastructure-demand",
+            observedAt: "2026-06-18T00:00:00.000Z",
+            finality: "confirmed",
+          },
+        ]
+      : [],
+    ...(!strong ? { weaknessReason: "Matched by structured criteria without enough cited source material." } : {}),
   };
 }
 
-function normalize(value: string): string {
-  return value.trim().toLowerCase();
+function uniqueCandidates(candidates: InstrumentSearchCandidate[]): InstrumentSearchCandidate[] {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = `${candidate.primaryMode}:${candidate.instrumentId}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function entry(
+  instrumentId: InstrumentId,
+  displayName: string,
+  market: Market,
+  ticker: string,
+  aliases: string[],
+  themes: string[],
+  sectors: string[],
+  defaultQualityFlags: QualityFlag[],
+): InstrumentCatalogEntry {
+  return { instrumentId, displayName, market, ticker, aliases, themes, sectors, defaultQualityFlags };
 }
 ```
 
@@ -433,7 +722,7 @@ function normalize(value: string): string {
 Run:
 
 ```bash
-npm --prefix apps/web test -- --run tests/natural-language-search.test.ts
+npm --prefix apps/web test -- --run tests/instrument-search.test.ts
 ```
 
 Expected: PASS.
@@ -441,13 +730,13 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/web/src/modules/natural-language-search.ts apps/web/tests/natural-language-search.test.ts
-git commit -m "feat: add natural language stock search"
+git add apps/web/src/modules/instrument-search.ts apps/web/tests/instrument-search.test.ts
+git commit -m "feat: search instruments with screening evidence"
 ```
 
 ---
 
-### Task 2: Search result assembly and dashboard rendering
+### Task 4: Search result cards and dashboard
 
 **Files:**
 - Create: `apps/web/src/modules/search-result-assembler.ts`
@@ -458,99 +747,94 @@ git commit -m "feat: add natural language stock search"
 
 **Interfaces:**
 - Consumes:
-  - `searchInstruments(query: string): NaturalLanguageSearchResult`
-  - `InstrumentSearchCandidate`
-  - `SearchIntent`
+  - `searchInstruments(query: string, options?: { portfolioAvailable?: boolean }): InstrumentSearchResult`
+  - `describeSearchIntent(intent: SearchIntent): string[]`
 - Produces:
   - `type SearchResultCard`
-  - `function assembleSearchResultCards(result: NaturalLanguageSearchResult): SearchResultCard[]`
+  - `function assembleSearchResultCards(result: InstrumentSearchResult): SearchResultCard[]`
   - `function renderDashboardSummary(input: DashboardSummaryInput): string`
 
-- [ ] **Step 1: Write failing search result assembler tests**
+- [ ] **Step 1: Write failing search result tests**
 
 Create `apps/web/tests/search-result-assembler.test.ts`:
 
 ```typescript
 import { describe, expect, it } from "vitest";
-import { searchInstruments } from "../src/modules/natural-language-search";
+import { searchInstruments } from "../src/modules/instrument-search";
 import { assembleSearchResultCards } from "../src/modules/search-result-assembler";
 
-describe("SearchResultAssembler", () => {
-  it("creates ranked professional result cards with signal and quality context", () => {
+describe("Search Result Assembler", () => {
+  it("applies Result Ranking Policy with Search Intent fit first", () => {
     const cards = assembleSearchResultCards(searchInstruments("US AI infrastructure BUY candidates"));
 
     expect(cards[0]).toMatchObject({
       instrumentId: "US:XNAS:NVDA",
       displayName: "NVIDIA",
+      primaryMode: "investment_idea_screen",
       actionLabel: "BUY",
       confidence: 0.88,
-      finality: "confirmed",
-      entryZone: { low: 118, high: 124 },
-      stopLevel: 109,
-      targetZone: { low: 138, high: 146 },
-      timeHorizon: "days_to_weeks",
-      aiContribution: 0.42,
-      aiWeightHaircut: 0.06,
-      qualityFlags: ["high_volatility"],
+      screeningEvidenceQuality: "strong",
     });
-    expect(cards[0].matchReasons).toContain("theme_match");
-    expect(cards[0].detailHref).toBe("/signals/US%3AXNAS%3ANVDA");
-    expect(cards[0].professionalContext).toContain("Professional review required");
+    expect(cards[0].rankingBreakdown).toEqual([
+      "Search Intent fit: 1",
+      "Confirmed Signal confidence: 0.88",
+      "Screening Evidence quality: 1",
+      "Portfolio relevance: 0",
+      "Risk penalty: -0.2",
+    ]);
   });
 
-  it("prioritizes portfolio-risk matches for portfolio queries", () => {
-    const cards = assembleSearchResultCards(searchInstruments("내 포트폴리오에서 손절 가까운 종목"));
+  it("shows portfolio unavailable state without silently applying portfolio ranking", () => {
+    const cards = assembleSearchResultCards(
+      searchInstruments("내 포트폴리오에서 손절 가까운 종목", { portfolioAvailable: false }),
+    );
 
-    expect(cards[0]).toMatchObject({
-      instrumentId: "KR:XKRX:005930",
-      portfolioAction: "REVIEW_REQUIRED",
-    });
-    expect(cards[0].matchReasons).toContain("portfolio_risk_match");
+    expect(cards[0].portfolioStateMessage).toBe(
+      "Portfolio unavailable; portfolio conditions were not included in ranking.",
+    );
   });
 });
 ```
 
-- [ ] **Step 2: Write failing dashboard rendering tests**
+- [ ] **Step 2: Write failing dashboard tests**
 
 Replace `apps/web/tests/dashboard.test.ts` with:
 
 ```typescript
 import { describe, expect, it } from "vitest";
-import { searchInstruments } from "../src/modules/natural-language-search";
+import { searchInstruments } from "../src/modules/instrument-search";
 import { assembleSearchResultCards } from "../src/modules/search-result-assembler";
 import { renderDashboardSummary } from "../src/modules/dashboard-summary";
 
 describe("ProfessionalWorkspace dashboard", () => {
-  it("renders natural language search, interpreted query, and ranked results", () => {
-    const searchResult = searchInstruments("US AI infrastructure BUY candidates");
+  it("renders two equal search modes with lookup-first results", () => {
+    const result = searchInstruments("삼성");
     const html = renderDashboardSummary({
-      query: "US AI infrastructure BUY candidates",
-      searchResult,
-      searchCards: assembleSearchResultCards(searchResult),
+      query: "삼성",
+      searchResult: result,
+      searchCards: assembleSearchResultCards(result),
     });
 
-    expect(html).toContain("Natural language stock search");
-    expect(html).toContain("US AI infrastructure BUY candidates");
-    expect(html).toContain("Interpreted query");
-    expect(html).toContain("US market");
-    expect(html).toContain("NVIDIA");
-    expect(html).toContain("BUY");
-    expect(html).toContain("Entry 118 - 124");
-    expect(html).toContain("AI Weight Haircut: 0.06");
-    expect(html).toContain("Professional review required");
+    expect(html).toContain("Stock Lookup");
+    expect(html).toContain("Investment Idea Screen");
+    expect(html).toContain("Lookup-first results");
+    expect(html).toContain("Related Investment Idea Screens");
+    expect(html).toContain("Samsung Electronics");
+    expect(html).toContain("Samsung C&amp;T");
   });
 
-  it("renders no-match guidance without hiding understood terms", () => {
-    const searchResult = searchInstruments("unknown quantum banana stock");
+  it("renders Screening Evidence, ranking, and decision-support context", () => {
+    const result = searchInstruments("US AI infrastructure BUY candidates");
     const html = renderDashboardSummary({
-      query: "unknown quantum banana stock",
-      searchResult,
-      searchCards: assembleSearchResultCards(searchResult),
+      query: "US AI infrastructure BUY candidates",
+      searchResult: result,
+      searchCards: assembleSearchResultCards(result),
     });
 
-    expect(html).toContain("No instruments matched");
-    expect(html).toContain("unknown, quantum, banana, stock");
-    expect(html).toContain("Try a ticker such as 005930 or AAPL.");
+    expect(html).toContain("Screening Evidence: strong");
+    expect(html).toContain("Search Intent fit: 1");
+    expect(html).toContain("Decision-support only");
+    expect(html).toContain("AI Weight Haircut: 0.06");
   });
 });
 ```
@@ -563,7 +847,7 @@ Run:
 npm --prefix apps/web test -- --run tests/search-result-assembler.test.ts tests/dashboard.test.ts
 ```
 
-Expected: FAIL with a missing `search-result-assembler` module and old `renderDashboardSummary` input type errors.
+Expected: FAIL with missing `search-result-assembler` and dashboard signature errors.
 
 - [ ] **Step 4: Implement search result assembly**
 
@@ -573,108 +857,102 @@ Create `apps/web/src/modules/search-result-assembler.ts`:
 import type { DataFinality, InstrumentId, QualityFlag } from "../domain/market";
 import type { PortfolioActionLabel } from "../domain/portfolio";
 import type { ActionLabel, TradeTimingPlan } from "../domain/signals";
-import type {
-  MatchReason,
-  NaturalLanguageSearchResult,
-} from "./natural-language-search";
+import type { InstrumentSearchResult } from "./instrument-search";
+import type { SearchMode } from "./search-intent";
 
 export type SearchResultCard = {
   instrumentId: InstrumentId;
   displayName: string;
+  primaryMode: SearchMode;
   actionLabel: ActionLabel;
   confidence: number;
   finality: DataFinality;
-  entryZone: TradeTimingPlan["entryZone"];
-  stopLevel: number;
-  targetZone: TradeTimingPlan["targetZone"];
-  timeHorizon: TradeTimingPlan["timeHorizon"];
+  tradeTimingPlan: TradeTimingPlan;
   aiContribution: number;
   aiWeightHaircut: number;
   portfolioAction: PortfolioActionLabel;
-  matchReasons: MatchReason[];
+  screeningEvidenceQuality?: "strong" | "weak";
   qualityFlags: QualityFlag[];
+  rankingBreakdown: string[];
+  portfolioStateMessage?: string;
   detailHref: string;
-  professionalContext: string;
 };
 
-const signalFixtures: Record<InstrumentId, Omit<SearchResultCard, "displayName" | "matchReasons" | "qualityFlags" | "detailHref">> = {
-  "KR:XKRX:005930": {
-    instrumentId: "KR:XKRX:005930",
-    actionLabel: "HOLD",
-    confidence: 0.64,
-    finality: "confirmed",
-    entryZone: { low: 71000, high: 73500 },
-    stopLevel: 67500,
-    targetZone: { low: 79000, high: 82500 },
-    timeHorizon: "days_to_weeks",
-    aiContribution: 0.21,
-    aiWeightHaircut: 0.08,
-    portfolioAction: "REVIEW_REQUIRED",
-    professionalContext: "Professional review required before external use.",
-  },
-  "KR:XKRX:000830": {
-    instrumentId: "KR:XKRX:000830",
-    actionLabel: "HOLD",
-    confidence: 0.57,
-    finality: "confirmed",
-    entryZone: { low: 154000, high: 159000 },
-    stopLevel: 148000,
-    targetZone: { low: 171000, high: 178000 },
-    timeHorizon: "days_to_weeks",
-    aiContribution: 0.18,
-    aiWeightHaircut: 0,
-    portfolioAction: "HOLD_AND_MONITOR",
-    professionalContext: "Professional review required before external use.",
-  },
-  "US:XNAS:AAPL": {
-    instrumentId: "US:XNAS:AAPL",
-    actionLabel: "BUY",
-    confidence: 0.82,
-    finality: "confirmed",
-    entryZone: { low: 198, high: 204 },
-    stopLevel: 188,
-    targetZone: { low: 224, high: 232 },
-    timeHorizon: "days_to_weeks",
-    aiContribution: 0.4,
-    aiWeightHaircut: 0,
-    portfolioAction: "NEW_BUY_CANDIDATE",
-    professionalContext: "Professional review required before external use.",
-  },
-  "US:XNAS:NVDA": {
-    instrumentId: "US:XNAS:NVDA",
-    actionLabel: "BUY",
-    confidence: 0.88,
-    finality: "confirmed",
-    entryZone: { low: 118, high: 124 },
-    stopLevel: 109,
-    targetZone: { low: 138, high: 146 },
-    timeHorizon: "days_to_weeks",
-    aiContribution: 0.42,
-    aiWeightHaircut: 0.06,
-    portfolioAction: "ADD_ON_CANDIDATE",
-    professionalContext: "Professional review required before external use.",
-  },
+const signals: Record<InstrumentId, Omit<SearchResultCard, "displayName" | "primaryMode" | "screeningEvidenceQuality" | "qualityFlags" | "rankingBreakdown" | "portfolioStateMessage" | "detailHref">> = {
+  "KR:XKRX:005930": signal("KR:XKRX:005930", "HOLD", 0.64, { low: 71000, high: 73500 }, 67500, { low: 79000, high: 82500 }, 0.21, 0.08, "REVIEW_REQUIRED"),
+  "KR:XKRX:000830": signal("KR:XKRX:000830", "HOLD", 0.57, { low: 154000, high: 159000 }, 148000, { low: 171000, high: 178000 }, 0.18, 0, "HOLD_AND_MONITOR"),
+  "US:XNAS:AAPL": signal("US:XNAS:AAPL", "BUY", 0.82, { low: 198, high: 204 }, 188, { low: 224, high: 232 }, 0.4, 0, "NEW_BUY_CANDIDATE"),
+  "US:XNAS:NVDA": signal("US:XNAS:NVDA", "BUY", 0.88, { low: 118, high: 124 }, 109, { low: 138, high: 146 }, 0.42, 0.06, "ADD_ON_CANDIDATE"),
 };
 
-export function assembleSearchResultCards(result: NaturalLanguageSearchResult): SearchResultCard[] {
-  return result.candidates
+export function assembleSearchResultCards(result: InstrumentSearchResult): SearchResultCard[] {
+  return result.primaryCandidates
     .map((candidate) => {
-      const signal = signalFixtures[candidate.instrumentId];
+      const signalFixture = signals[candidate.instrumentId];
+      const screeningEvidenceQuality = candidate.screeningEvidence?.quality;
       return {
-        ...signal,
+        ...signalFixture,
         displayName: candidate.displayName,
-        matchReasons: candidate.matchReasons,
+        primaryMode: candidate.primaryMode,
+        ...(screeningEvidenceQuality ? { screeningEvidenceQuality } : {}),
         qualityFlags: candidate.qualityFlags,
+        rankingBreakdown: rankingBreakdown(signalFixture.confidence, screeningEvidenceQuality, candidate.qualityFlags),
+        ...(!result.portfolioState.available && result.portfolioState.message
+          ? { portfolioStateMessage: result.portfolioState.message }
+          : {}),
         detailHref: `/signals/${encodeURIComponent(candidate.instrumentId)}`,
       };
     })
-    .sort((left, right) => scoreCard(right) - scoreCard(left));
+    .sort((left, right) => rank(right) - rank(left));
 }
 
-function scoreCard(card: SearchResultCard): number {
-  const portfolioBoost = card.matchReasons.includes("portfolio_risk_match") ? 1 : 0;
-  const themeBoost = card.matchReasons.includes("theme_match") ? 0.4 : 0;
-  return card.confidence + portfolioBoost + themeBoost;
+function rankingBreakdown(
+  confidence: number,
+  screeningEvidenceQuality: "strong" | "weak" | undefined,
+  qualityFlags: QualityFlag[],
+): string[] {
+  return [
+    "Search Intent fit: 1",
+    `Confirmed Signal confidence: ${confidence}`,
+    `Screening Evidence quality: ${screeningEvidenceQuality === "strong" ? 1 : screeningEvidenceQuality === "weak" ? 0.35 : 0}`,
+    "Portfolio relevance: 0",
+    `Risk penalty: ${qualityFlags.includes("high_volatility") ? -0.2 : 0}`,
+  ];
+}
+
+function rank(card: SearchResultCard): number {
+  const evidence = card.screeningEvidenceQuality === "strong" ? 1 : card.screeningEvidenceQuality === "weak" ? 0.35 : 0;
+  const riskPenalty = card.qualityFlags.includes("high_volatility") ? -0.2 : 0;
+  return 1 * 10 + card.confidence + evidence + riskPenalty;
+}
+
+function signal(
+  instrumentId: InstrumentId,
+  actionLabel: ActionLabel,
+  confidence: number,
+  entryZone: { low: number; high: number },
+  stopLevel: number,
+  targetZone: { low: number; high: number },
+  aiContribution: number,
+  aiWeightHaircut: number,
+  portfolioAction: PortfolioActionLabel,
+) {
+  return {
+    instrumentId,
+    actionLabel,
+    confidence,
+    finality: "confirmed" as const,
+    tradeTimingPlan: {
+      actionLabel,
+      entryZone,
+      stopLevel,
+      targetZone,
+      timeHorizon: "days_to_weeks" as const,
+    },
+    aiContribution,
+    aiWeightHaircut,
+    portfolioAction,
+  };
 }
 ```
 
@@ -683,12 +961,13 @@ function scoreCard(card: SearchResultCard): number {
 Replace `apps/web/src/modules/dashboard-summary.ts` with:
 
 ```typescript
-import type { NaturalLanguageSearchResult } from "./natural-language-search";
+import { describeSearchIntent } from "./search-intent";
+import type { InstrumentSearchResult } from "./instrument-search";
 import type { SearchResultCard } from "./search-result-assembler";
 
 export type DashboardSummaryInput = {
   query: string;
-  searchResult: NaturalLanguageSearchResult;
+  searchResult: InstrumentSearchResult;
   searchCards: SearchResultCard[];
 };
 
@@ -698,11 +977,11 @@ export function renderDashboardSummary(input: DashboardSummaryInput): string {
     "<header>",
     "<p>Professional Stock Signal Workspace</p>",
     "<h1>Natural language stock search</h1>",
-    "<p>Search by company, ticker, market, theme, Trade Timing Plan, or Portfolio risk. Professional review required before external use.</p>",
+    "<p>Decision-support only. Professional review required before external use.</p>",
     "</header>",
     renderSearchForm(input.query),
-    renderInterpretedQuery(input.searchResult),
-    renderSearchResults(input.searchResult, input.searchCards),
+    renderIntent(input.searchResult),
+    renderCards(input.searchResult, input.searchCards),
     "</section>",
   ].join("");
 }
@@ -710,53 +989,41 @@ export function renderDashboardSummary(input: DashboardSummaryInput): string {
 function renderSearchForm(query: string): string {
   return [
     '<form method="get" action="/">',
-    `<label for="q">Natural language query</label>`,
+    "<fieldset>",
+    "<legend>Search modes</legend>",
+    "<span>Stock Lookup</span>",
+    "<span>Investment Idea Screen</span>",
+    "</fieldset>",
+    '<label for="q">Natural language query</label>',
     `<input id="q" name="q" value="${escapeHtml(query)}" placeholder="US AI infrastructure BUY candidates" />`,
-    "<button type=\"submit\">Search</button>",
+    '<button type="submit">Search</button>',
     "</form>",
-    '<p class="prompt-examples">Examples: Samsung Electronics, AAPL, Korean battery names with reversal momentum, My portfolio holdings near stop levels</p>',
   ].join("");
 }
 
-function renderInterpretedQuery(result: NaturalLanguageSearchResult): string {
-  const market = result.intent.market ? `${result.intent.market} market` : "All supported markets";
-  const filters = result.intent.filters.length > 0 ? result.intent.filters.join(", ") : "company or ticker";
-  const themes = result.intent.themes.length > 0 ? result.intent.themes.join(", ") : "No theme filter";
-  const ambiguity = result.ambiguity
-    ? `<p class="quality-warning">${escapeHtml(result.ambiguity.message)} ${result.ambiguity.candidateInstrumentIds.map(escapeHtml).join(", ")}</p>`
-    : "";
-
+function renderIntent(result: InstrumentSearchResult): string {
+  const heading = result.intent.ambiguity === "lookup_first" ? "Lookup-first results" : "Interpreted Search Intent";
   return [
     "<section>",
-    "<h2>Interpreted query</h2>",
-    `<p>${escapeHtml(market)} · Filters: ${escapeHtml(filters)} · Themes: ${escapeHtml(themes)}</p>`,
-    ambiguity,
+    `<h2>${heading}</h2>`,
+    ...describeSearchIntent(result.intent).map((line) => `<p>${escapeHtml(line)}</p>`),
+    result.relatedScreenCandidates.length > 0 ? "<h3>Related Investment Idea Screens</h3>" : "",
+    result.portfolioState.message ? `<p>${escapeHtml(result.portfolioState.message)}</p>` : "",
     "</section>",
   ].join("");
 }
 
-function renderSearchResults(
-  result: NaturalLanguageSearchResult,
-  cards: SearchResultCard[],
-): string {
+function renderCards(result: InstrumentSearchResult, cards: SearchResultCard[]): string {
   if (result.noMatch) {
     return [
-      "<section>",
-      "<h2>No instruments matched</h2>",
+      "<section><h2>No instruments matched</h2>",
       `<p>Understood terms: ${escapeHtml(result.noMatch.understoodTerms.join(", "))}</p>`,
-      "<ul>",
-      ...result.noMatch.suggestedPrompts.map((prompt) => `<li>${escapeHtml(prompt)}</li>`),
-      "</ul>",
+      ...result.noMatch.suggestedPrompts.map((prompt) => `<p>${escapeHtml(prompt)}</p>`),
       "</section>",
     ].join("");
   }
 
-  return [
-    "<section>",
-    "<h2>Ranked candidates</h2>",
-    ...cards.map(renderCard),
-    "</section>",
-  ].join("");
+  return ["<section><h2>Ranked candidates</h2>", ...cards.map(renderCard), "</section>"].join("");
 }
 
 function renderCard(card: SearchResultCard): string {
@@ -764,12 +1031,12 @@ function renderCard(card: SearchResultCard): string {
     '<article class="search-result-card">',
     `<h3>${escapeHtml(card.displayName)} <span>${escapeHtml(card.instrumentId)}</span></h3>`,
     `<p><strong>${escapeHtml(card.actionLabel)}</strong> · Confidence ${card.confidence} · ${escapeHtml(card.finality)}</p>`,
-    `<p>Entry ${card.entryZone.low} - ${card.entryZone.high} · Stop ${card.stopLevel} · Target ${card.targetZone.low} - ${card.targetZone.high}</p>`,
-    `<p>Match reasons: ${card.matchReasons.map(escapeHtml).join(", ")}</p>`,
-    `<p>Portfolio action: ${escapeHtml(card.portfolioAction)}</p>`,
+    "<p>Decision-support only. Review Required conditions and conflicting evidence must be checked in detail.</p>",
+    `<p>Entry ${card.tradeTimingPlan.entryZone.low} - ${card.tradeTimingPlan.entryZone.high} · Stop ${card.tradeTimingPlan.stopLevel} · Target ${card.tradeTimingPlan.targetZone.low} - ${card.tradeTimingPlan.targetZone.high}</p>`,
+    `<p>Screening Evidence: ${escapeHtml(card.screeningEvidenceQuality ? card.screeningEvidenceQuality : "not applicable")}</p>`,
     `<p>AI contribution: ${card.aiContribution} · AI Weight Haircut: ${card.aiWeightHaircut}</p>`,
-    `<p>Quality flags: ${card.qualityFlags.map(escapeHtml).join(", ") || "none"}</p>`,
-    `<p>${escapeHtml(card.professionalContext)}</p>`,
+    ...card.rankingBreakdown.map((line) => `<p>${escapeHtml(line)}</p>`),
+    card.portfolioStateMessage ? `<p>${escapeHtml(card.portfolioStateMessage)}</p>` : "",
     `<a href="${escapeHtml(card.detailHref)}">Open research detail</a>`,
     "</article>",
   ].join("");
@@ -791,7 +1058,7 @@ Replace `apps/web/app/page.tsx` with:
 
 ```typescript
 import { renderDashboardSummary } from "../src/modules/dashboard-summary";
-import { searchInstruments } from "../src/modules/natural-language-search";
+import { searchInstruments } from "../src/modules/instrument-search";
 import { assembleSearchResultCards } from "../src/modules/search-result-assembler";
 
 export default async function Page({
@@ -826,46 +1093,39 @@ Expected: PASS.
 
 ```bash
 git add apps/web/src/modules/search-result-assembler.ts apps/web/src/modules/dashboard-summary.ts apps/web/tests/search-result-assembler.test.ts apps/web/tests/dashboard.test.ts apps/web/app/page.tsx
-git commit -m "feat: render natural language search dashboard"
+git commit -m "feat: render two-mode search dashboard"
 ```
 
 ---
 
-### Task 3: Visualization view models
+### Task 5: Chart-ready research models
 
 **Files:**
-- Create: `apps/web/src/modules/visualizations.ts`
-- Create: `apps/web/tests/visualizations.test.ts`
+- Create: `apps/web/src/modules/research-chart-models.ts`
+- Create: `apps/web/tests/research-chart-models.test.ts`
 
 **Interfaces:**
-- Consumes: `InstrumentId` from `apps/web/src/domain/market.ts`
 - Produces:
-  - `type VisualizationPanel<T>`
-  - `type PriceVolumeChartModel`
-  - `type IndicatorPanelModel`
-  - `type SignalContributionModel`
-  - `type RiskMetricModel`
-  - `type BacktestChartModel`
-  - `type PortfolioExposureModel`
-  - `function buildVisualizationSuite(instrumentId: InstrumentId): VisualizationSuite`
+  - `type ChartPanel<T>`
+  - `type ResearchChartSuite`
+  - `function buildResearchChartSuite(instrumentId: InstrumentId): ResearchChartSuite`
 
-- [ ] **Step 1: Write failing visualization tests**
+- [ ] **Step 1: Write the failing tests**
 
-Create `apps/web/tests/visualizations.test.ts`:
+Create `apps/web/tests/research-chart-models.test.ts`:
 
 ```typescript
 import { describe, expect, it } from "vitest";
-import { buildVisualizationSuite } from "../src/modules/visualizations";
+import { buildResearchChartSuite } from "../src/modules/research-chart-models";
 
-describe("visualization view models", () => {
-  it("builds chart-ready data for a complete professional signal detail", () => {
-    const suite = buildVisualizationSuite("US:XNAS:NVDA");
+describe("research chart models", () => {
+  it("builds chart-ready models for a complete signal detail", () => {
+    const suite = buildResearchChartSuite("US:XNAS:NVDA");
 
     expect(suite.priceVolume.state).toBe("available");
     expect(suite.priceVolume.data?.entryZone).toEqual({ low: 118, high: 124 });
-    expect(suite.indicators.state).toBe("available");
     expect(suite.indicators.data?.rsi).toBe(61);
-    expect(suite.signalContribution.data?.segments).toEqual([
+    expect(suite.contribution.data?.segments).toEqual([
       { label: "Rules and factors", value: 0.52 },
       { label: "AI context", value: 0.42 },
       { label: "AI Weight Haircut", value: -0.06 },
@@ -878,8 +1138,8 @@ describe("visualization view models", () => {
     });
   });
 
-  it("returns explicit unavailable states when chart data is absent", () => {
-    const suite = buildVisualizationSuite("KR:XKRX:000830");
+  it("returns explicit unavailable states when a panel lacks enough data", () => {
+    const suite = buildResearchChartSuite("KR:XKRX:000830");
 
     expect(suite.backtest).toEqual({
       state: "unavailable",
@@ -894,185 +1154,131 @@ describe("visualization view models", () => {
 Run:
 
 ```bash
-npm --prefix apps/web test -- --run tests/visualizations.test.ts
+npm --prefix apps/web test -- --run tests/research-chart-models.test.ts
 ```
 
-Expected: FAIL with a missing `visualizations` module.
+Expected: FAIL with a missing `research-chart-models` module.
 
-- [ ] **Step 3: Implement visualization view models**
+- [ ] **Step 3: Implement chart-ready models**
 
-Create `apps/web/src/modules/visualizations.ts`:
+Create `apps/web/src/modules/research-chart-models.ts`:
 
 ```typescript
 import type { InstrumentId } from "../domain/market";
 
-export type VisualizationPanel<T> =
+export type ChartPanel<T> =
   | { state: "available"; data: T }
   | { state: "unavailable"; reason: string };
 
-export type PriceVolumeChartModel = {
-  points: Array<{ date: string; close: number; volume: number }>;
-  entryZone: { low: number; high: number };
-  stopLevel: number;
-  targetZone: { low: number; high: number };
-  signalMarkers: Array<{ date: string; label: string }>;
+export type ResearchChartSuite = {
+  priceVolume: ChartPanel<{
+    points: Array<{ date: string; close: number; volume: number }>;
+    entryZone: { low: number; high: number };
+    stopLevel: number;
+    targetZone: { low: number; high: number };
+  }>;
+  indicators: ChartPanel<{
+    rsi: number;
+    macd: number;
+    movingAverage20: number;
+    movingAverage60: number;
+    volatility: number;
+    volumeSurge: number;
+  }>;
+  contribution: ChartPanel<{
+    finalConfidence: number;
+    segments: Array<{ label: string; value: number }>;
+  }>;
+  risk: ChartPanel<{
+    metrics: Array<{ label: string; value: number }>;
+  }>;
+  backtest: ChartPanel<{
+    winRate: number;
+    expectedValue: number;
+    maxDrawdown: number;
+    equityCurve: Array<{ period: string; value: number }>;
+  }>;
+  portfolioExposure: ChartPanel<{
+    weights: Array<{ label: string; value: number }>;
+  }>;
 };
 
-export type IndicatorPanelModel = {
-  movingAverage20: number;
-  movingAverage60: number;
-  rsi: number;
-  macd: number;
-  volatility: number;
-  volumeSurge: number;
-};
-
-export type SignalContributionModel = {
-  finalConfidence: number;
-  segments: Array<{ label: string; value: number }>;
-};
-
-export type RiskMetricModel = {
-  metrics: Array<{ label: string; value: number }>;
-};
-
-export type BacktestChartModel = {
-  winRate: number;
-  expectedValue: number;
-  maxDrawdown: number;
-  equityCurve: Array<{ period: string; value: number }>;
-};
-
-export type PortfolioExposureModel = {
-  weights: Array<{ label: string; value: number }>;
-};
-
-export type VisualizationSuite = {
-  priceVolume: VisualizationPanel<PriceVolumeChartModel>;
-  indicators: VisualizationPanel<IndicatorPanelModel>;
-  signalContribution: VisualizationPanel<SignalContributionModel>;
-  risk: VisualizationPanel<RiskMetricModel>;
-  backtest: VisualizationPanel<BacktestChartModel>;
-  portfolioExposure: VisualizationPanel<PortfolioExposureModel>;
-};
-
-export function buildVisualizationSuite(instrumentId: InstrumentId): VisualizationSuite {
-  if (instrumentId === "KR:XKRX:000830") {
-    return {
-      priceVolume: availablePriceVolume({ low: 154000, high: 159000 }, 148000, { low: 171000, high: 178000 }),
-      indicators: availableIndicators(47),
-      signalContribution: availableSignalContribution(0.57, 0.39, 0.18, 0),
-      risk: availableRisk("moderate"),
-      backtest: {
-        state: "unavailable",
-        reason: "Insufficient backtest sample for this instrument.",
-      },
-      portfolioExposure: availablePortfolioExposure("Industrials", 0.12),
-    };
-  }
-
+export function buildResearchChartSuite(instrumentId: InstrumentId): ResearchChartSuite {
+  const isIncomplete = instrumentId === "KR:XKRX:000830";
   return {
-    priceVolume: availablePriceVolume({ low: 118, high: 124 }, 109, { low: 138, high: 146 }),
-    indicators: availableIndicators(61),
-    signalContribution: availableSignalContribution(0.88, 0.52, 0.42, 0.06),
-    risk: availableRisk("high"),
-    backtest: {
+    priceVolume: {
       state: "available",
       data: {
-        winRate: 0.58,
-        expectedValue: 0.14,
-        maxDrawdown: 0.18,
-        equityCurve: [
-          { period: "2022", value: 1 },
-          { period: "2023", value: 1.18 },
-          { period: "2024", value: 1.32 },
-          { period: "2025", value: 1.41 },
+        points: [
+          { date: "2026-06-14", close: 116, volume: 1200000 },
+          { date: "2026-06-15", close: 119, volume: 1420000 },
+          { date: "2026-06-16", close: 123, volume: 1810000 },
+          { date: "2026-06-17", close: 126, volume: 1740000 },
+        ],
+        entryZone: isIncomplete ? { low: 154000, high: 159000 } : { low: 118, high: 124 },
+        stopLevel: isIncomplete ? 148000 : 109,
+        targetZone: isIncomplete ? { low: 171000, high: 178000 } : { low: 138, high: 146 },
+      },
+    },
+    indicators: {
+      state: "available",
+      data: {
+        rsi: isIncomplete ? 47 : 61,
+        macd: 1.8,
+        movingAverage20: 122,
+        movingAverage60: 115,
+        volatility: isIncomplete ? 0.18 : 0.24,
+        volumeSurge: isIncomplete ? 1.08 : 1.42,
+      },
+    },
+    contribution: {
+      state: "available",
+      data: {
+        finalConfidence: isIncomplete ? 0.57 : 0.88,
+        segments: [
+          { label: "Rules and factors", value: isIncomplete ? 0.39 : 0.52 },
+          { label: "AI context", value: isIncomplete ? 0.18 : 0.42 },
+          { label: "AI Weight Haircut", value: isIncomplete ? 0 : -0.06 },
         ],
       },
     },
-    portfolioExposure: availablePortfolioExposure("Semiconductors", 0.34),
-  };
-}
-
-function availablePriceVolume(
-  entryZone: { low: number; high: number },
-  stopLevel: number,
-  targetZone: { low: number; high: number },
-): VisualizationPanel<PriceVolumeChartModel> {
-  return {
-    state: "available",
-    data: {
-      points: [
-        { date: "2026-06-14", close: entryZone.low - 3, volume: 1200000 },
-        { date: "2026-06-15", close: entryZone.low, volume: 1420000 },
-        { date: "2026-06-16", close: entryZone.high, volume: 1810000 },
-        { date: "2026-06-17", close: entryZone.high + 2, volume: 1740000 },
-      ],
-      entryZone,
-      stopLevel,
-      targetZone,
-      signalMarkers: [{ date: "2026-06-17", label: "Confirmed Signal" }],
+    risk: {
+      state: "available",
+      data: {
+        metrics: [
+          { label: "Volatility", value: isIncomplete ? 0.42 : 0.76 },
+          { label: "Concentration", value: isIncomplete ? 0.37 : 0.68 },
+          { label: "Liquidity", value: 0.22 },
+          { label: "Event risk", value: isIncomplete ? 0.33 : 0.61 },
+          { label: "Data quality", value: 0.18 },
+          { label: "AI uncertainty", value: isIncomplete ? 0.29 : 0.44 },
+        ],
+      },
     },
-  };
-}
-
-function availableIndicators(rsi: number): VisualizationPanel<IndicatorPanelModel> {
-  return {
-    state: "available",
-    data: {
-      movingAverage20: 122,
-      movingAverage60: 115,
-      rsi,
-      macd: 1.8,
-      volatility: 0.24,
-      volumeSurge: 1.42,
-    },
-  };
-}
-
-function availableSignalContribution(
-  finalConfidence: number,
-  rulesContribution: number,
-  aiContribution: number,
-  aiWeightHaircut: number,
-): VisualizationPanel<SignalContributionModel> {
-  return {
-    state: "available",
-    data: {
-      finalConfidence,
-      segments: [
-        { label: "Rules and factors", value: rulesContribution },
-        { label: "AI context", value: aiContribution },
-        { label: "AI Weight Haircut", value: -aiWeightHaircut },
-      ],
-    },
-  };
-}
-
-function availableRisk(level: "moderate" | "high"): VisualizationPanel<RiskMetricModel> {
-  return {
-    state: "available",
-    data: {
-      metrics: [
-        { label: "Volatility", value: level === "high" ? 0.76 : 0.42 },
-        { label: "Concentration", value: level === "high" ? 0.68 : 0.37 },
-        { label: "Liquidity", value: 0.22 },
-        { label: "Event risk", value: level === "high" ? 0.61 : 0.33 },
-        { label: "Data quality", value: 0.18 },
-        { label: "AI uncertainty", value: level === "high" ? 0.44 : 0.29 },
-      ],
-    },
-  };
-}
-
-function availablePortfolioExposure(
-  label: string,
-  value: number,
-): VisualizationPanel<PortfolioExposureModel> {
-  return {
-    state: "available",
-    data: {
-      weights: [{ label, value }],
+    backtest: isIncomplete
+      ? {
+          state: "unavailable",
+          reason: "Insufficient backtest sample for this instrument.",
+        }
+      : {
+          state: "available",
+          data: {
+            winRate: 0.58,
+            expectedValue: 0.14,
+            maxDrawdown: 0.18,
+            equityCurve: [
+              { period: "2022", value: 1 },
+              { period: "2023", value: 1.18 },
+              { period: "2024", value: 1.32 },
+              { period: "2025", value: 1.41 },
+            ],
+          },
+        },
+    portfolioExposure: {
+      state: "available",
+      data: {
+        weights: [{ label: isIncomplete ? "Industrials" : "Semiconductors", value: isIncomplete ? 0.12 : 0.34 }],
+      },
     },
   };
 }
@@ -1083,7 +1289,7 @@ function availablePortfolioExposure(
 Run:
 
 ```bash
-npm --prefix apps/web test -- --run tests/visualizations.test.ts
+npm --prefix apps/web test -- --run tests/research-chart-models.test.ts
 ```
 
 Expected: PASS.
@@ -1091,13 +1297,201 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/web/src/modules/visualizations.ts apps/web/tests/visualizations.test.ts
-git commit -m "feat: add signal visualization view models"
+git add apps/web/src/modules/research-chart-models.ts apps/web/tests/research-chart-models.test.ts
+git commit -m "feat: add research chart models"
 ```
 
 ---
 
-### Task 4: Professional research detail page
+### Task 6: Recharts components
+
+**Files:**
+- Create: `apps/web/src/modules/research-charts.tsx`
+- Create: `apps/web/tests/research-charts.test.tsx`
+
+**Interfaces:**
+- Consumes:
+  - `ResearchChartSuite` from `apps/web/src/modules/research-chart-models.ts`
+- Produces:
+  - `function renderResearchCharts(suite: ResearchChartSuite): React.ReactElement`
+
+- [ ] **Step 1: Write failing Recharts tests**
+
+Create `apps/web/tests/research-charts.test.tsx`:
+
+```typescript
+import { describe, expect, it } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { buildResearchChartSuite } from "../src/modules/research-chart-models";
+import { renderResearchCharts } from "../src/modules/research-charts";
+
+describe("research Recharts components", () => {
+  it("renders professional chart panel labels from chart-ready models", () => {
+    const html = renderToStaticMarkup(renderResearchCharts(buildResearchChartSuite("US:XNAS:NVDA")));
+
+    expect(html).toContain("Price and Volume");
+    expect(html).toContain("Technical Indicators");
+    expect(html).toContain("Signal Contribution");
+    expect(html).toContain("Risk Profile");
+    expect(html).toContain("Strategy Backtest");
+    expect(html).toContain("Portfolio Exposure");
+  });
+
+  it("renders unavailable chart states visibly", () => {
+    const html = renderToStaticMarkup(renderResearchCharts(buildResearchChartSuite("KR:XKRX:000830")));
+
+    expect(html).toContain("Insufficient backtest sample for this instrument.");
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run:
+
+```bash
+npm --prefix apps/web test -- --run tests/research-charts.test.tsx
+```
+
+Expected: FAIL with a missing `research-charts` module.
+
+- [ ] **Step 3: Implement Recharts components**
+
+Create `apps/web/src/modules/research-charts.tsx`:
+
+```typescript
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import type { ReactElement } from "react";
+import type { ChartPanel, ResearchChartSuite } from "./research-chart-models";
+
+export function renderResearchCharts(suite: ResearchChartSuite): ReactElement {
+  return (
+    <section aria-label="Research visualizations">
+      <ChartSection title="Price and Volume" panel={suite.priceVolume}>
+        {(data) => (
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={data.points}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Line type="monotone" dataKey="close" stroke="#2563eb" />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </ChartSection>
+      <ChartSection title="Technical Indicators" panel={suite.indicators}>
+        {(data) => (
+          <BarChart width={480} height={220} data={[data]}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="rsi" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="rsi" fill="#0f766e" />
+            <Bar dataKey="volumeSurge" fill="#7c3aed" />
+          </BarChart>
+        )}
+      </ChartSection>
+      <ChartSection title="Signal Contribution" panel={suite.contribution}>
+        {(data) => (
+          <BarChart width={520} height={220} data={data.segments}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="label" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="value" fill="#1d4ed8" />
+          </BarChart>
+        )}
+      </ChartSection>
+      <ChartSection title="Risk Profile" panel={suite.risk}>
+        {(data) => (
+          <RadarChart width={420} height={280} data={data.metrics}>
+            <PolarGrid />
+            <PolarAngleAxis dataKey="label" />
+            <PolarRadiusAxis />
+            <Radar dataKey="value" fill="#dc2626" fillOpacity={0.4} stroke="#dc2626" />
+          </RadarChart>
+        )}
+      </ChartSection>
+      <ChartSection title="Strategy Backtest" panel={suite.backtest}>
+        {(data) => (
+          <LineChart width={520} height={220} data={data.equityCurve}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="period" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="value" stroke="#16a34a" />
+          </LineChart>
+        )}
+      </ChartSection>
+      <ChartSection title="Portfolio Exposure" panel={suite.portfolioExposure}>
+        {(data) => (
+          <BarChart width={420} height={220} data={data.weights}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="label" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="value" fill="#f59e0b" />
+          </BarChart>
+        )}
+      </ChartSection>
+    </section>
+  );
+}
+
+function ChartSection<T>({
+  title,
+  panel,
+  children,
+}: {
+  title: string;
+  panel: ChartPanel<T>;
+  children: (data: T) => ReactElement;
+}): ReactElement {
+  return (
+    <section aria-label={title}>
+      <h3>{title}</h3>
+      {panel.state === "available" ? children(panel.data) : <p>{panel.reason}</p>}
+    </section>
+  );
+}
+```
+
+- [ ] **Step 4: Run tests to verify they pass**
+
+Run:
+
+```bash
+npm --prefix apps/web test -- --run tests/research-charts.test.tsx
+```
+
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/web/src/modules/research-charts.tsx apps/web/tests/research-charts.test.tsx
+git commit -m "feat: render research charts with recharts"
+```
+
+---
+
+### Task 7: Professional research detail page
 
 **Files:**
 - Create: `apps/web/src/modules/research-detail.ts`
@@ -1106,15 +1500,13 @@ git commit -m "feat: add signal visualization view models"
 
 **Interfaces:**
 - Consumes:
-  - `buildVisualizationSuite(instrumentId: InstrumentId): VisualizationSuite`
-  - `InstrumentId`, `QualityFlag`
-  - `ActionLabel`, `SignalDecision`
+  - `buildResearchChartSuite(instrumentId: InstrumentId): ResearchChartSuite`
 - Produces:
   - `type ResearchDetailViewModel`
-  - `function buildResearchDetail(instrumentId: InstrumentId): ResearchDetailViewModel`
+  - `function buildResearchDetail(instrumentId: InstrumentId, options?: { portfolioAvailable?: boolean }): ResearchDetailViewModel`
   - `function renderResearchDetailPage(detail: ResearchDetailViewModel): string`
 
-- [ ] **Step 1: Write failing research detail tests**
+- [ ] **Step 1: Write failing detail tests**
 
 Create `apps/web/tests/research-detail.test.ts`:
 
@@ -1122,29 +1514,40 @@ Create `apps/web/tests/research-detail.test.ts`:
 import { describe, expect, it } from "vitest";
 import { buildResearchDetail, renderResearchDetailPage } from "../src/modules/research-detail";
 
-describe("ResearchDetailAssembler", () => {
-  it("builds and renders all report-grade professional sections", () => {
-    const detail = buildResearchDetail("US:XNAS:NVDA");
-    const html = renderResearchDetailPage(detail);
+describe("Research Detail", () => {
+  it("renders fixed summary and tabbed Research Report Panels", () => {
+    const html = renderResearchDetailPage(buildResearchDetail("US:XNAS:NVDA"));
 
-    expect(detail.instrumentId).toBe("US:XNAS:NVDA");
-    expect(detail.tradeTimingPlan.actionLabel).toBe("BUY");
-    expect(html).toContain("Executive Signal Brief");
-    expect(html).toContain("Trade Timing Plan");
-    expect(html).toContain("Evidence Stack");
-    expect(html).toContain("Technical and Quant Dashboard");
-    expect(html).toContain("AI Context and Citations");
-    expect(html).toContain("Portfolio Impact");
-    expect(html).toContain("Strategy Backtest");
-    expect(html).toContain("Risk and Data Quality");
-    expect(html).toContain("Audit Trail");
-    expect(html).toContain("Research and Report Actions");
-    expect(html).toContain("Entry Zone: 118 - 124");
-    expect(html).toContain("AI Weight Haircut: 0.06");
-    expect(html).toContain("Professional review required before external use.");
+    expect(html).toContain("Signal Brief");
+    expect(html).toContain("Trade Timing");
+    expect(html).toContain("Report tabs");
+    expect(html).toContain("Evidence Panel");
+    expect(html).toContain("Technical Report Panel");
+    expect(html).toContain("AI Context Report Panel");
+    expect(html).toContain("Portfolio Impact Report Panel");
+    expect(html).toContain("Backtest Report Panel");
+    expect(html).toContain("Risk Report Panel");
+    expect(html).toContain("Audit Panel");
+    expect(html).toContain("Research and Report Actions Panel");
   });
 
-  it("renders explicit unavailable states for missing backtest data", () => {
+  it("pairs strong Action Labels with decision-support copy and risk evidence", () => {
+    const html = renderResearchDetailPage(buildResearchDetail("US:XNAS:NVDA"));
+
+    expect(html).toContain("BUY");
+    expect(html).toContain("Decision-support only");
+    expect(html).toContain("Review Required conditions");
+    expect(html).toContain("High volatility requires disciplined entry and stop monitoring.");
+  });
+
+  it("marks Portfolio Impact unavailable without making portfolio claims", () => {
+    const html = renderResearchDetailPage(buildResearchDetail("US:XNAS:NVDA", { portfolioAvailable: false }));
+
+    expect(html).toContain("Portfolio Impact Report Panel");
+    expect(html).toContain("Portfolio unavailable; portfolio-specific claims are not shown.");
+  });
+
+  it("shows insufficient backtest sample as review-required", () => {
     const html = renderResearchDetailPage(buildResearchDetail("KR:XKRX:000830"));
 
     expect(html).toContain("Insufficient backtest sample for this instrument.");
@@ -1163,14 +1566,14 @@ npm --prefix apps/web test -- --run tests/research-detail.test.ts
 
 Expected: FAIL with a missing `research-detail` module.
 
-- [ ] **Step 3: Implement the research detail module**
+- [ ] **Step 3: Implement research detail view model and renderer**
 
 Create `apps/web/src/modules/research-detail.ts`:
 
 ```typescript
 import type { InstrumentId, QualityFlag } from "../domain/market";
 import type { ActionLabel, EvidenceSource, TradeTimingPlan } from "../domain/signals";
-import { buildVisualizationSuite, type VisualizationSuite } from "./visualizations";
+import { buildResearchChartSuite, type ResearchChartSuite } from "./research-chart-models";
 
 export type ResearchDetailViewModel = {
   instrumentId: InstrumentId;
@@ -1182,196 +1585,123 @@ export type ResearchDetailViewModel = {
   aiContribution: number;
   aiWeightHaircut: number;
   rationale: string[];
+  conflictingEvidence: string[];
   evidence: EvidenceSource[];
-  aiContext: {
-    catalystScore: number;
-    uncertaintyScore: number;
-    evidenceQuality: number;
-    freshnessScore: number;
-    contradictionFlags: string[];
-  };
-  portfolioImpact: string;
-  backtestSummary: {
-    winRate?: number;
-    expectedValue?: number;
-    maxDrawdown?: number;
-    averageHoldingPeriod?: string;
-    limitation?: string;
-  };
   qualityFlags: QualityFlag[];
+  portfolioAvailable: boolean;
+  portfolioImpact: string;
+  backtestLimitation?: string;
   auditEvents: string[];
-  visualizations: VisualizationSuite;
+  charts: ResearchChartSuite;
 };
 
-export function buildResearchDetail(instrumentId: InstrumentId): ResearchDetailViewModel {
-  if (instrumentId === "KR:XKRX:000830") {
-    return {
-      instrumentId,
-      displayName: "Samsung C&T",
-      actionLabel: "HOLD",
-      confidence: 0.57,
-      finality: "confirmed",
-      tradeTimingPlan: {
-        actionLabel: "HOLD",
-        entryZone: { low: 154000, high: 159000 },
-        stopLevel: 148000,
-        targetZone: { low: 171000, high: 178000 },
-        timeHorizon: "days_to_weeks",
-      },
-      aiContribution: 0.18,
-      aiWeightHaircut: 0,
-      rationale: ["Dividend stability supports monitoring, but backtest evidence is limited."],
-      evidence: [source("research", "Dividend stability screen", "https://example.com/samsung-ct")],
-      aiContext: {
-        catalystScore: 0.21,
-        uncertaintyScore: 0.34,
-        evidenceQuality: 0.63,
-        freshnessScore: 0.72,
-        contradictionFlags: [],
-      },
-      portfolioImpact: "Hold and monitor; avoid adding until backtest support improves.",
-      backtestSummary: {
-        limitation: "Insufficient backtest sample for this instrument.",
-      },
-      qualityFlags: ["insufficient_backtest_sample"],
-      auditEvents: ["Confirmed Signal recalculated from end-of-day data."],
-      visualizations: buildVisualizationSuite(instrumentId),
-    };
-  }
-
+export function buildResearchDetail(
+  instrumentId: InstrumentId,
+  options: { portfolioAvailable?: boolean } = {},
+): ResearchDetailViewModel {
+  const portfolioAvailable = options.portfolioAvailable !== false;
+  const isLimitedBacktest = instrumentId === "KR:XKRX:000830";
   return {
     instrumentId,
-    displayName: instrumentId === "US:XNAS:AAPL" ? "Apple" : "NVIDIA",
-    actionLabel: "BUY",
-    confidence: instrumentId === "US:XNAS:AAPL" ? 0.82 : 0.88,
+    displayName: instrumentId === "KR:XKRX:000830" ? "Samsung C&T" : instrumentId === "US:XNAS:AAPL" ? "Apple" : "NVIDIA",
+    actionLabel: isLimitedBacktest ? "HOLD" : "BUY",
+    confidence: isLimitedBacktest ? 0.57 : 0.88,
     finality: "confirmed",
-    tradeTimingPlan: instrumentId === "US:XNAS:AAPL"
-      ? {
-          actionLabel: "BUY",
-          entryZone: { low: 198, high: 204 },
-          stopLevel: 188,
-          targetZone: { low: 224, high: 232 },
-          timeHorizon: "days_to_weeks",
-        }
-      : {
-          actionLabel: "BUY",
-          entryZone: { low: 118, high: 124 },
-          stopLevel: 109,
-          targetZone: { low: 138, high: 146 },
-          timeHorizon: "days_to_weeks",
-        },
-    aiContribution: instrumentId === "US:XNAS:AAPL" ? 0.4 : 0.42,
-    aiWeightHaircut: instrumentId === "US:XNAS:AAPL" ? 0 : 0.06,
-    rationale: [
-      "Trend, volume confirmation, and AI infrastructure catalyst evidence align with the Strategy Profile.",
-      "High volatility requires disciplined entry and stop monitoring.",
-    ],
+    tradeTimingPlan: isLimitedBacktest
+      ? timing("HOLD", 154000, 159000, 148000, 171000, 178000)
+      : timing("BUY", 118, 124, 109, 138, 146),
+    aiContribution: isLimitedBacktest ? 0.18 : 0.42,
+    aiWeightHaircut: isLimitedBacktest ? 0 : 0.06,
+    rationale: isLimitedBacktest
+      ? ["Dividend stability supports monitoring, but backtest evidence is limited."]
+      : ["Trend, volume confirmation, and AI infrastructure catalyst evidence align with the Strategy Profile."],
+    conflictingEvidence: isLimitedBacktest
+      ? ["Insufficient backtest sample for this instrument."]
+      : ["High volatility requires disciplined entry and stop monitoring."],
     evidence: [
-      source("price", "Price and volume confirmation", "https://example.com/price-volume"),
-      source("news", "AI infrastructure demand update", "https://example.com/ai-demand"),
-      source("filing", "Confirmed company filing reference", "https://example.com/filing"),
+      {
+        sourceType: "news",
+        title: "AI infrastructure demand update",
+        url: "https://example.com/ai-demand",
+        observedAt: "2026-06-18T00:00:00.000Z",
+        finality: "confirmed",
+      },
     ],
-    aiContext: {
-      catalystScore: 0.74,
-      uncertaintyScore: 0.31,
-      evidenceQuality: 0.82,
-      freshnessScore: 0.91,
-      contradictionFlags: [],
-    },
-    portfolioImpact: "Add-on candidate, but position size should respect semiconductor concentration.",
-    backtestSummary: {
-      winRate: 0.58,
-      expectedValue: 0.14,
-      maxDrawdown: 0.18,
-      averageHoldingPeriod: "13 trading days",
-    },
-    qualityFlags: instrumentId === "US:XNAS:AAPL" ? ["confirmed_end_of_day_data"] : ["high_volatility"],
+    qualityFlags: isLimitedBacktest ? ["insufficient_backtest_sample"] : ["high_volatility"],
+    portfolioAvailable,
+    portfolioImpact: portfolioAvailable
+      ? "Add-on candidate, but position size should respect semiconductor concentration."
+      : "Portfolio unavailable; portfolio-specific claims are not shown.",
+    ...(isLimitedBacktest ? { backtestLimitation: "Insufficient backtest sample for this instrument." } : {}),
     auditEvents: [
       "Confirmed Signal recalculated from end-of-day data.",
       "Strategy Profile version swing-momentum-v1 applied.",
       "AI Weight Haircut recorded for source uncertainty.",
     ],
-    visualizations: buildVisualizationSuite(instrumentId),
+    charts: buildResearchChartSuite(instrumentId),
   };
 }
 
 export function renderResearchDetailPage(detail: ResearchDetailViewModel): string {
   return [
     '<article class="research-detail">',
-    `<header><p>${escapeHtml(detail.instrumentId)}</p><h1>${escapeHtml(detail.displayName)} Research Detail</h1><p>Professional review required before external use.</p></header>`,
-    section("Executive Signal Brief", [
-      `<p><strong>${escapeHtml(detail.actionLabel)}</strong> · Confidence ${detail.confidence} · ${escapeHtml(detail.finality)}</p>`,
-      `<p>${detail.rationale.map(escapeHtml).join(" ")}</p>`,
+    `<header><p>${escapeHtml(detail.instrumentId)}</p><h1>${escapeHtml(detail.displayName)} Research Detail</h1></header>`,
+    fixedSummary(detail),
+    '<section aria-label="Report tabs"><h2>Report tabs</h2>',
+    panel("Evidence Panel", [
+      ...detail.evidence.map((source) => `${source.sourceType}: ${source.title}`),
+      ...detail.conflictingEvidence,
     ]),
-    section("Trade Timing Plan", [
-      `<p>Entry Zone: ${detail.tradeTimingPlan.entryZone.low} - ${detail.tradeTimingPlan.entryZone.high}</p>`,
-      `<p>Stop Level: ${detail.tradeTimingPlan.stopLevel}</p>`,
-      `<p>Target Zone: ${detail.tradeTimingPlan.targetZone.low} - ${detail.tradeTimingPlan.targetZone.high}</p>`,
-      `<p>Time Horizon: ${escapeHtml(detail.tradeTimingPlan.timeHorizon)}</p>`,
+    panel("Technical Report Panel", ["Recharts technical indicators are rendered from chart-ready models."]),
+    panel("AI Context Report Panel", [`AI contribution: ${detail.aiContribution}`, `AI Weight Haircut: ${detail.aiWeightHaircut}`]),
+    panel("Portfolio Impact Report Panel", [detail.portfolioImpact]),
+    panel("Backtest Report Panel", detail.backtestLimitation
+      ? [detail.backtestLimitation, "Review required before interpreting performance support."]
+      : ["Win rate, expected value, maximum drawdown, and equity curve available."]),
+    panel("Risk Report Panel", [`Quality flags: ${detail.qualityFlags.join(", ")}`, ...detail.conflictingEvidence]),
+    panel("Audit Panel", detail.auditEvents),
+    panel("Research and Report Actions Panel", [
+      "Generate or update an editable Research Note from this evidence.",
+      "Draft a Client Report only after Research Note approval and Portfolio context review.",
     ]),
-    section("Evidence Stack", detail.evidence.map((item) => `<p>${escapeHtml(item.sourceType)} · <a href="${escapeHtml(item.url)}">${escapeHtml(item.title)}</a> · ${escapeHtml(item.finality)}</p>`)),
-    section("Technical and Quant Dashboard", renderVisualizationSummary(detail)),
-    section("AI Context and Citations", [
-      `<p>Catalyst Score: ${detail.aiContext.catalystScore}</p>`,
-      `<p>Uncertainty Score: ${detail.aiContext.uncertaintyScore}</p>`,
-      `<p>Evidence Quality: ${detail.aiContext.evidenceQuality}</p>`,
-      `<p>Freshness Score: ${detail.aiContext.freshnessScore}</p>`,
-      `<p>AI contribution: ${detail.aiContribution} · AI Weight Haircut: ${detail.aiWeightHaircut}</p>`,
-    ]),
-    section("Portfolio Impact", [`<p>${escapeHtml(detail.portfolioImpact)}</p>`]),
-    section("Strategy Backtest", renderBacktest(detail)),
-    section("Risk and Data Quality", [
-      `<p>Quality flags: ${detail.qualityFlags.map(escapeHtml).join(", ") || "none"}</p>`,
-      "<p>Review required when data quality falls below configured thresholds.</p>",
-    ]),
-    section("Audit Trail", detail.auditEvents.map((event) => `<p>${escapeHtml(event)}</p>`)),
-    section("Research and Report Actions", [
-      "<p>Generate or update an editable Research Note from this evidence.</p>",
-      "<p>Draft a Client Report only after Research Note approval and Portfolio context review.</p>",
-    ]),
+    "</section>",
     "</article>",
   ].join("");
 }
 
-function renderVisualizationSummary(detail: ResearchDetailViewModel): string[] {
-  const indicators = detail.visualizations.indicators;
-  const priceVolume = detail.visualizations.priceVolume;
+function fixedSummary(detail: ResearchDetailViewModel): string {
   return [
-    priceVolume.state === "available"
-      ? `<p>Price chart includes entry zone, stop level, target zone, and signal-change markers.</p>`
-      : `<p>${escapeHtml(priceVolume.reason)}</p>`,
-    indicators.state === "available"
-      ? `<p>RSI ${indicators.data.rsi} · MACD ${indicators.data.macd} · Volume surge ${indicators.data.volumeSurge}</p>`
-      : `<p>${escapeHtml(indicators.reason)}</p>`,
-  ];
+    '<section class="fixed-summary">',
+    "<h2>Signal Brief</h2>",
+    `<p><strong>${escapeHtml(detail.actionLabel)}</strong> · Confidence ${detail.confidence} · ${detail.finality}</p>`,
+    "<p>Decision-support only. Review Required conditions and conflicting evidence must be checked before external use.</p>",
+    `<p>${detail.rationale.map(escapeHtml).join(" ")}</p>`,
+    "<h2>Trade Timing</h2>",
+    `<p>Entry Zone: ${detail.tradeTimingPlan.entryZone.low} - ${detail.tradeTimingPlan.entryZone.high}</p>`,
+    `<p>Stop Level: ${detail.tradeTimingPlan.stopLevel}</p>`,
+    `<p>Target Zone: ${detail.tradeTimingPlan.targetZone.low} - ${detail.tradeTimingPlan.targetZone.high}</p>`,
+    "</section>",
+  ].join("");
 }
 
-function renderBacktest(detail: ResearchDetailViewModel): string[] {
-  if (detail.backtestSummary.limitation) {
-    return [
-      `<p>${escapeHtml(detail.backtestSummary.limitation)}</p>`,
-      "<p>Review required before interpreting performance support.</p>",
-    ];
-  }
-  return [
-    `<p>Win Rate: ${detail.backtestSummary.winRate}</p>`,
-    `<p>Expected Value: ${detail.backtestSummary.expectedValue}</p>`,
-    `<p>Maximum Drawdown: ${detail.backtestSummary.maxDrawdown}</p>`,
-    `<p>Average Holding Period: ${escapeHtml(detail.backtestSummary.averageHoldingPeriod ? detail.backtestSummary.averageHoldingPeriod : "unavailable")}</p>`,
-  ];
+function panel(title: string, rows: string[]): string {
+  return [`<section><h3>${escapeHtml(title)}</h3>`, ...rows.map((row) => `<p>${escapeHtml(row)}</p>`), "</section>"].join("");
 }
 
-function section(title: string, rows: string[]): string {
-  return [`<section><h2>${escapeHtml(title)}</h2>`, ...rows, "</section>"].join("");
-}
-
-function source(sourceType: EvidenceSource["sourceType"], title: string, url: string): EvidenceSource {
+function timing(
+  actionLabel: ActionLabel,
+  entryLow: number,
+  entryHigh: number,
+  stopLevel: number,
+  targetLow: number,
+  targetHigh: number,
+): TradeTimingPlan {
   return {
-    sourceType,
-    title,
-    url,
-    observedAt: "2026-06-18T00:00:00.000Z",
-    finality: "confirmed",
+    actionLabel,
+    entryZone: { low: entryLow, high: entryHigh },
+    stopLevel,
+    targetZone: { low: targetLow, high: targetHigh },
+    timeHorizon: "days_to_weeks",
   };
 }
 
@@ -1420,23 +1750,19 @@ Expected: PASS.
 
 ```bash
 git add apps/web/src/modules/research-detail.ts apps/web/tests/research-detail.test.ts apps/web/app/signals/[instrumentId]/page.tsx
-git commit -m "feat: render professional signal research detail"
+git commit -m "feat: render professional research detail panels"
 ```
 
 ---
 
-### Task 5: Full validation and integration polish
+### Task 8: Full validation
 
 **Files:**
-- Modify: files from Tasks 1-4 only if typecheck, build, or integration tests expose defects.
+- Modify only files introduced or changed by Tasks 1-7 if validation exposes defects.
 
 **Interfaces:**
-- Consumes:
-  - `searchInstruments(query: string): NaturalLanguageSearchResult`
-  - `assembleSearchResultCards(result: NaturalLanguageSearchResult): SearchResultCard[]`
-  - `buildResearchDetail(instrumentId: InstrumentId): ResearchDetailViewModel`
-  - `renderResearchDetailPage(detail: ResearchDetailViewModel): string`
-- Produces: a passing test suite and typecheck for the natural language search and professional detail feature.
+- Consumes all interfaces from Tasks 1-7.
+- Produces a passing web test suite, typecheck, and build.
 
 - [ ] **Step 1: Run the complete web test suite**
 
@@ -1468,11 +1794,11 @@ npm --prefix apps/web run build
 
 Expected: PASS and a successful Next.js production build.
 
-- [ ] **Step 4: Fix any validation defects with focused tests**
+- [ ] **Step 4: Fix validation defects with focused tests**
 
-If Step 1, Step 2, or Step 3 fails, change only the files introduced or modified by this plan. Add or adjust a focused test that proves the defect is fixed, then rerun the failing command.
+If Step 1, Step 2, or Step 3 fails, change only files introduced or modified by this plan. Add or adjust a focused test that proves the defect is fixed, then rerun the failing command.
 
-For example, if `decodeURIComponent` handling fails for an encoded InstrumentId route, add this test to `apps/web/tests/research-detail.test.ts`:
+Example focused route decoding test for `apps/web/tests/research-detail.test.ts`:
 
 ```typescript
 it("builds detail for an encoded InstrumentId after route decoding", () => {
@@ -1482,7 +1808,7 @@ it("builds detail for an encoded InstrumentId after route decoding", () => {
 });
 ```
 
-Then run:
+Run:
 
 ```bash
 npm --prefix apps/web test -- --run tests/research-detail.test.ts
@@ -1490,13 +1816,13 @@ npm --prefix apps/web test -- --run tests/research-detail.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit validation fixes or record no-op validation**
+- [ ] **Step 5: Commit validation fixes if needed**
 
-If files changed during Task 5, run:
+If files changed during Task 8, run:
 
 ```bash
 git add apps/web
-git commit -m "fix: polish natural language research integration"
+git commit -m "fix: polish stock research search integration"
 ```
 
-If no files changed during Task 5, do not create an empty commit. Record the passing commands in the task completion note.
+If no files changed during Task 8, do not create an empty commit. Record the passing commands in the task completion note.
