@@ -110,8 +110,8 @@ describe("Research Detail", () => {
   it("renders report tabs as interactive controls and only shows the selected panel by default", () => {
     const html = renderResearchDetailPage(buildResearchDetail("US:XNAS:NVDA"));
 
-    expect(html).toContain('<a class="tab-chip active" href="#panel-evidence" aria-current="page">Evidence</a>');
-    expect(html).toContain('<a class="tab-chip" href="#panel-technical">Technical</a>');
+    expect(html).toContain('<a class="tab-chip active" href="?panel=evidence" aria-current="page">Evidence</a>');
+    expect(html).toContain('<a class="tab-chip" href="?panel=technical">Technical</a>');
     expect(html).not.toContain("<span class=\"tab-chip\">Evidence</span>");
     expect(html).toContain('<section id="panel-evidence" class="report-panel active">');
     expect(html).not.toContain("Technical Report Panel</h3>");

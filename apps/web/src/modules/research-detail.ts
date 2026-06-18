@@ -37,7 +37,17 @@ type ResearchFixture = {
   backtestLimitation?: string;
 };
 
-type ReportPanelId = "evidence" | "technical" | "ai-context" | "portfolio" | "backtest" | "risk" | "audit" | "actions";
+export type ReportPanelId = "evidence" | "technical" | "ai-context" | "portfolio" | "backtest" | "risk" | "audit" | "actions";
+
+const reportPanelIds: ReportPanelId[] = ["evidence", "technical", "ai-context", "portfolio", "backtest", "risk", "audit", "actions"];
+
+export function parseReportPanelId(value: string | undefined): ReportPanelId | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  return reportPanelIds.find((panelId) => panelId === value);
+}
 
 export function buildResearchDetail(
   instrumentId: InstrumentId,
@@ -217,7 +227,7 @@ function tabNav(selectedPanel: ReportPanelId): string {
     '<nav class="segmented-tabs" aria-label="Research Report Panels">',
     ...tabs.map(({ id, label }) => {
       const active = id === selectedPanel;
-      return `<a class="tab-chip${active ? " active" : ""}" href="#panel-${id}"${active ? ' aria-current="page"' : ""}>${escapeHtml(label)}</a>`;
+      return `<a class="tab-chip${active ? " active" : ""}" href="?panel=${id}"${active ? ' aria-current="page"' : ""}>${escapeHtml(label)}</a>`;
     }),
     "</nav>",
   ].join("");
