@@ -14,6 +14,9 @@ export function toInstrumentId(parts: InstrumentParts): InstrumentId {
   if (parts.symbol.trim().length === 0) {
     throw new Error("InstrumentId symbol must not be empty");
   }
+  if (parts.symbol.includes(":")) {
+    throw new Error("InstrumentId symbol must not contain ':'");
+  }
   return `${parts.market}:${parts.exchange}:${parts.symbol}` as InstrumentId;
 }
 

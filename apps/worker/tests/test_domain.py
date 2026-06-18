@@ -21,6 +21,11 @@ def test_instrument_id_rejects_extra_colon_segments() -> None:
         InstrumentId.parse("KR:XKRX:005930:EXTRA")
 
 
+def test_instrument_id_rejects_symbol_containing_colon() -> None:
+    with pytest.raises(ValueError, match="InstrumentId symbol must not contain ':'"):
+        InstrumentId(market="KR", exchange="XKRX", symbol="005930:EXTRA")
+
+
 def test_default_strategy_profile_weights() -> None:
     profile = StrategyProfile.default_swing_momentum()
 

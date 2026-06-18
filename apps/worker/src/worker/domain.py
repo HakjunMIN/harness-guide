@@ -21,6 +21,10 @@ class InstrumentId:
     exchange: Exchange
     symbol: str
 
+    def __post_init__(self) -> None:
+        if ":" in self.symbol:
+            raise ValueError("InstrumentId symbol must not contain ':'")
+
     def __str__(self) -> str:
         return f"{self.market}:{self.exchange}:{self.symbol}"
 

@@ -33,6 +33,16 @@ describe("domain language", () => {
     ).toThrow("Invalid InstrumentId");
   });
 
+  it("rejects InstrumentId symbols containing colons", () => {
+    expect(() =>
+      toInstrumentId({
+        market: "KR",
+        exchange: "XKRX",
+        symbol: "005930:EXTRA",
+      }),
+    ).toThrow("InstrumentId symbol must not contain ':'");
+  });
+
   it("defines the default Strategy Profile AI weighting", () => {
     expect(defaultSwingMomentumProfile.aiWeight).toBe(0.4);
     expect(defaultSwingMomentumProfile.rulesWeight).toBe(0.6);
