@@ -20,4 +20,10 @@ describe("research Recharts components", () => {
 
     expect(html).toContain("Insufficient backtest sample for this instrument.");
   });
+
+  it("wraps rendered chart panels in horizontally scrollable containers", () => {
+    const html = renderToStaticMarkup(renderResearchCharts(buildResearchChartSuite("US:XNAS:NVDA")));
+
+    expect(html.match(/class="chart-scroll"/g) ?? []).toHaveLength(6);
+  });
 });

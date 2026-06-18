@@ -105,7 +105,11 @@ function ChartSection<T>({
   return (
     <section aria-label={title}>
       <h3>{title}</h3>
-      {panel.state === "available" ? children(panel.data) : <p>{panel.reason}</p>}
+      {panel.state === "available" ? (
+        <div className="chart-scroll">{children(panel.data)}</div>
+      ) : (
+        <p>{panel.reason}</p>
+      )}
     </section>
   );
 }
