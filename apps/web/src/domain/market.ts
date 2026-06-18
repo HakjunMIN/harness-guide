@@ -29,7 +29,7 @@ export function parseInstrumentId(instrumentId: InstrumentId): InstrumentParts {
   if (
     (market !== "KR" && market !== "US") ||
     !["XKRX", "XKOSDAQ", "XNYS", "XNAS"].includes(exchange) ||
-    !symbol
+    symbol.trim().length === 0
   ) {
     throw new Error(`Invalid InstrumentId: ${instrumentId}`);
   }

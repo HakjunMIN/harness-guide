@@ -33,6 +33,12 @@ describe("domain language", () => {
     ).toThrow("Invalid InstrumentId");
   });
 
+  it("rejects InstrumentId values with whitespace-only symbols", () => {
+    expect(() => parseInstrumentId("US:XNAS:   " as InstrumentId)).toThrow(
+      "Invalid InstrumentId",
+    );
+  });
+
   it("rejects InstrumentId symbols containing colons", () => {
     expect(() =>
       toInstrumentId({
