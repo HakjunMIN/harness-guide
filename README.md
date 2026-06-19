@@ -61,16 +61,24 @@
 > `executing-plans`(및 `test-driven-development`·`finishing-a-development-branch` 등)을
 > 참조한다. 이 저장소에는 그 **참조 스킬이 모두 함께 설치**되어 끊긴 의존성이 없다.
 
-### 프론트엔드 / UX (생성 → 크래프트)
-프론트엔드 작업은 **만들기 → 정제하기** 두 층으로 나뉜다. `frontend-design`이 대담하고
-세련된 UI를 *생성*하면, ibelick의 크래프트 스킬이 그 결과를 일관된 기준으로 *정제*한다.
+### 프론트엔드 / UX (생성 → 테이스트 → 정제)
+프론트엔드 작업은 **생성 → 테이스트 → 정제** 세 층으로 나뉜다. `frontend-design`이
+대담하고 의도적인 비주얼을 *생성*하고, `design-taste-frontend`가 브리프를 읽어 올바른
+디자인 방향(테이스트)을 잡아 "템플릿 같지 않은" 결과를 만들며, ibelick의 크래프트
+스킬이 그 결과를 일관된 기준으로 *정제*한다. 생성·테이스트 산출물도 사람이 grilling으로
+검토한 뒤 다음으로 넘어간다.
 
 | 스킬 | 출처 | 역할 |
 |------|------|------|
-| `frontend-design` | (전역 설치) | 생성형 미학 — 타이포·컬러·모션·구성으로 "AI 슬롭"을 피한 세련된 UI 생성 |
+| `frontend-design` | anthropics/skills | 생성형 미학 — 타이포·컬러·구성으로 템플릿 기본값처럼 보이지 않는 의도적 비주얼 디자인 생성 |
+| `design-taste-frontend` | leonxlnx/taste-skill | anti-slop 테이스트 — 브리프에서 디자인 방향을 추론, 리디자인은 audit-first·엄격한 pre-flight (랜딩·포트폴리오·리디자인 특화) |
 | `baseline-ui` | ibelick | anti-slop 정제 — 스페이싱·위계·타이포·레이아웃을 의견 있는 기준으로 정리(Tailwind/Base UI/`motion`) |
 | `fixing-accessibility` | ibelick | 키보드·포커스·ARIA 등 접근성 결함 수정 |
 | `fixing-motion-performance` | ibelick | 애니메이션 성능(지터·리플로우) 점검·개선 |
+
+> **스코프 메모.** `design-taste-frontend`는 랜딩 페이지·포트폴리오·리디자인에 특화되어
+> 있고 대시보드·데이터 테이블·다단계 제품 UI에는 맞지 않는다. 그런 화면은 `frontend-design`
+> 생성 + `baseline-ui` 정제 조합을 쓴다.
 
 > **선택 확장.** 프로덕션 품질 게이트(Core Web Vitals·성능·SEO·Lighthouse 감사)가 필요하면
 > [`addyosmani/web-quality-skills`](https://github.com/addyosmani/web-quality-skills)
@@ -97,7 +105,7 @@
 | **1. 정렬** | 무엇을 만들지 합의 | **`grill-with-docs`**(설계를 끝까지 추궁 + 용어집/ADR 작성) | `brainstorming`(접근법 발산, 설계안 제안) |
 | **2. 모듈 설계** | 어떻게 잘 만들지 | `codebase-design`(작은 인터페이스·깊은 구현·깨끗한 seam) + `domain-modeling`(결정 기록) | — |
 | **3. 계획** | 실행 가능한 작업으로 분해 | `writing-plans` 초안을 grilling으로 검토·확정 | `writing-plans`(파일·인터페이스 명시한 TDD 계획 초안 생성) |
-| **4. 구현** | 코드 작성 | `tdd`/`test-driven-development`로 슬라이스마다 red-green-refactor를 사람이 확인 / *프론트엔드면* `frontend-design` 결과를 사람이 검토 | `subagent-driven-development`/`executing-plans`로 계획 병렬 실행(옵트인) |
+| **4. 구현** | 코드 작성 | `tdd`/`test-driven-development`로 슬라이스마다 red-green-refactor를 사람이 확인 / *프론트엔드면* `frontend-design`+`design-taste-frontend` 생성 결과를 사람이 검토 | `subagent-driven-development`/`executing-plans`로 계획 병렬 실행(옵트인) |
 | **5. 디버깅** | 막히면 | `systematic-debugging` 가설을 사람과 합의 | — |
 | **6. 리뷰·검증** | 품질 게이트 | 자동 리뷰/검증 결과를 grilling으로 사람에게 확인받은 뒤 진행 / *프론트엔드면* `baseline-ui`·`fixing-accessibility`·`fixing-motion-performance`로 정제 | `requesting-code-review` + `verification-before-completion`(자동 제안) |
 | **7. 출시** | 통합/배포 | 사람이 통합 결정 | `finishing-a-development-branch` (머지·PR·정리) |
